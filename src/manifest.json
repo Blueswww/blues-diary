@@ -21,7 +21,6 @@
       "minified": true
     },
     "usingComponents": true,
-    "permission": {},
-    "cloud": true
+    "permission": {}
   }
 }

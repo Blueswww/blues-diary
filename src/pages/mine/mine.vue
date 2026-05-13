@@ -15,6 +15,7 @@ const version = ref('1.0.0')
 
 onShow(() => {
   diaryCount.value = Object.keys(diaryStore.diaryMap).length
+  weekStreak.value = diaryStore.weekStreak || 0
 })
 
 function goToTags() {
@@ -36,33 +37,47 @@ function handleLogout() {
     },
   })
 }
+
+function handleLogin() {
+  userStore.loginWithWechat()
+}
 </script>
 
 <template>
   <view class="page">
-    <!-- 用户信息 -->
-    <view class="user-section card">
-      <view class="avatar">
-        <text class="avatar-text">{{ userStore.userInfo?.nickName?.charAt(0) || 'U' }}</text>
-      </view>
-      <text class="nickname">{{ userStore.userInfo?.nickName || '用户' }}</text>
+    <!-- 未登录 -->
+    <view class="login-prompt card" v-if="!userStore.isLoggedIn">
+      <text class="login-icon">👤</text>
+      <text class="login-title">未登录</text>
+      <text class="login-desc">登录后可同步数据到云端</text>
+      <button class="login-btn" @tap="handleLogin">微信一键登录</button>
     </view>
 
-    <!-- 数据统计 -->
-    <view class="stats-row card">
-      <view class="stat-item">
-        <text class="stat-number">{{ diaryCount }}</text>
-        <text class="stat-label">日记</text>
+    <!-- 用户信息（已登录） -->
+    <template v-else>
+      <view class="user-section card">
+        <view class="avatar">
+          <text class="avatar-text">{{ userStore.userInfo?.nickName?.charAt(0) || 'U' }}</text>
+        </view>
+        <text class="nickname">{{ userStore.userInfo?.nickName || '用户' }}</text>
       </view>
-      <view class="stat-item">
-        <text class="stat-number">{{ todoStore.todos.length }}</text>
-        <text class="stat-label">待办</text>
+
+      <!-- 数据统计 -->
+      <view class="stats-row card">
+        <view class="stat-item">
+          <text class="stat-number">{{ diaryCount }}</text>
+          <text class="stat-label">日记</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-number">{{ todoStore.todos.length }}</text>
+          <text class="stat-label">待办</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-number">{{ weekStreak }}</text>
+          <text class="stat-label">连续天数</text>
+        </view>
       </view>
-      <view class="stat-item">
-        <text class="stat-number">{{ weekStreak }}</text>
-        <text class="stat-label">连续天数</text>
-      </view>
-    </view>
+    </template>
 
     <!-- 功能菜单 -->
     <view class="menu-section card">
@@ -78,11 +93,11 @@ function handleLogout() {
       </view>
     </view>
 
-    <!-- 设置 -->
-    <view class="menu-section card">
+    <!-- 退出登录 -->
+    <view class="menu-section card" v-if="userStore.isLoggedIn">
       <view class="menu-item" @tap="handleLogout">
         <text class="menu-icon">👋</text>
-        <text class="menu-label" style="color: $danger-color">退出登录</text>
+        <text class="menu-label" style="color: #ff4757">退出登录</text>
       </view>
     </view>
 
@@ -92,6 +107,25 @@ function handleLogout() {
 
 <style lang="scss" scoped>
 .page { padding-top: 24rpx; }
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 32rpx;
+  .login-icon { font-size: 80rpx; margin-bottom: 16rpx; }
+  .login-title { font-size: 36rpx; font-weight: 600; margin-bottom: 8rpx; }
+  .login-desc { font-size: 26rpx; color: $text-secondary; margin-bottom: 32rpx; }
+  .login-btn {
+    width: 80%;
+    height: 88rpx;
+    line-height: 88rpx;
+    background: $primary-color;
+    color: #fff;
+    border-radius: 44rpx;
+    font-size: 30rpx;
+    text-align: center;
+  }
+}
 .user-section {
   display: flex;
   flex-direction: column;

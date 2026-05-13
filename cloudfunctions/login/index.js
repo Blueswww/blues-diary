@@ -8,12 +8,39 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const usersCollection = db.collection('users')
 
+/** HTTP 触发兼容：标准化事件 */
+function normalizeEvent(event) {
+  if (event.httpMethod) {
+    const body = event.body ? JSON.parse(event.body) : {}
+    return {
+      ...body,
+      _openid: event.headers?.['X-WX-OPENID'] || event.headers?.['x-wx-openid'],
+      _isHttp: true
+    }
+  }
+  return event
+}
+
+/** HTTP 触发器统一响应 */
+function httpResponse(result) {
+  return {
+    isBase64Encoded: false,
+    statusCode: result.success ? 200 : 400,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(result)
+  }
+}
+
+function wrapResult(event, result) {
+  return event._isHttp ? httpResponse(result) : result
+}
+
 exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
-  const { OPENID } = wxContext
+  event = normalizeEvent(event)
+  const OPENID = event._isHttp ? event._openid : cloud.getWXContext().OPENID
 
   if (!OPENID) {
-    return { success: false, error: '获取用户身份失败' }
+    return wrapResult(event, { success: false, error: '获取用户身份失败' })
   }
 
   try {
@@ -21,8 +48,7 @@ exports.main = async (event, context) => {
     const existing = await usersCollection.where({ openid: OPENID }).get()
 
     if (existing.data.length === 0) {
-      // 新用户，创建记录
-      const result = await usersCollection.add({
+      await usersCollection.add({
         data: {
           openid: OPENID,
           nickName: event.nickName || '用户',
@@ -31,17 +57,9 @@ exports.main = async (event, context) => {
           lastLoginAt: db.serverDate(),
         },
       })
-
-      return {
-        success: true,
-        data: {
-          openid: OPENID,
-          isNewUser: true,
-        },
-      }
+      return wrapResult(event, { success: true, data: { openid: OPENID, isNewUser: true } })
     }
 
-    // 已有用户，更新登录时间
     const user = existing.data[0]
     await usersCollection.doc(user._id).update({
       data: {
@@ -51,7 +69,7 @@ exports.main = async (event, context) => {
       },
     })
 
-    return {
+    return wrapResult(event, {
       success: true,
       data: {
         openid: OPENID,
@@ -59,9 +77,9 @@ exports.main = async (event, context) => {
         nickName: user.nickName,
         avatarUrl: user.avatarUrl,
       },
-    }
+    })
   } catch (err) {
     console.error('[login] 登录失败:', err)
-    return { success: false, error: '登录失败，请重试' }
+    return wrapResult(event, { success: false, error: '登录失败，请重试' })
   }
 }

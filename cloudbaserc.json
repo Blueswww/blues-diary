@@ -5,27 +5,72 @@
     {
       "name": "login",
       "timeout": 5,
-      "triggers": []
+      "triggers": [
+        {
+          "name": "http",
+          "type": "http",
+          "config": {
+            "path": "/login",
+            "method": "POST"
+          }
+        }
+      ]
     },
     {
       "name": "diary",
       "timeout": 10,
-      "triggers": []
+      "triggers": [
+        {
+          "name": "http",
+          "type": "http",
+          "config": {
+            "path": "/diary",
+            "method": "POST"
+          }
+        }
+      ]
     },
     {
       "name": "tag",
       "timeout": 5,
-      "triggers": []
+      "triggers": [
+        {
+          "name": "http",
+          "type": "http",
+          "config": {
+            "path": "/tag",
+            "method": "POST"
+          }
+        }
+      ]
     },
     {
       "name": "todo",
       "timeout": 5,
-      "triggers": []
+      "triggers": [
+        {
+          "name": "http",
+          "type": "http",
+          "config": {
+            "path": "/todo",
+            "method": "POST"
+          }
+        }
+      ]
     },
     {
       "name": "anniversary",
       "timeout": 5,
-      "triggers": []
+      "triggers": [
+        {
+          "name": "http",
+          "type": "http",
+          "config": {
+            "path": "/anniversary",
+            "method": "POST"
+          }
+        }
+      ]
     }
   ]
 }

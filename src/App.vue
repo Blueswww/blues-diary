@@ -4,19 +4,12 @@ import { useUserStore } from '@/store/user'
 
 onLaunch(() => {
   console.log('App Launch')
-  // 初始化云开发环境（通过 globalThis['w'+'x'] 绕过 uni-app 的 wx 标识符变换）
+  // 初始化云开发环境
   // #ifdef MP-WEIXIN
-  try {
-    const wxNative = globalThis['w' + 'x']
-    console.log('[App] wxNative type:', typeof wxNative)
-    console.log('[App] wxNative.cloud:', typeof wxNative?.cloud)
-    wxNative.cloud.init({
-      env: 'cloud1-d5gdqeljo6eacbfc2'
-    })
-    console.log('[App] cloud init success')
-  } catch (e) {
-    console.error('[App] cloud init error:', e)
-  }
+  const wxNative = globalThis['w' + 'x']
+  wxNative.cloud.init({
+    env: 'cloud1-d5gdqeljo6eacbfc2'
+  })
   // #endif
   // 尝试自动登录
   const userStore = useUserStore()

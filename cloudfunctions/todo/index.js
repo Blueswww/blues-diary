@@ -7,30 +7,47 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
+function normalizeEvent(event) {
+  if (event.httpMethod) {
+    const body = event.body ? JSON.parse(event.body) : {}
+    return { ...body, _openid: event.headers?.['X-WX-OPENID'] || event.headers?.['x-wx-openid'], _isHttp: true }
+  }
+  return event
+}
+
+function httpResponse(result) {
+  return { isBase64Encoded: false, statusCode: result.success ? 200 : 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) }
+}
+
+function wrapResult(event, result) {
+  return event._isHttp ? httpResponse(result) : result
+}
+
+function getUserId(event) {
+  return event._isHttp ? event._openid : cloud.getWXContext().OPENID
+}
+
 exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
-  const userId = wxContext.OPENID
+  event = normalizeEvent(event)
+  const userId = getUserId(event)
 
   if (!userId) {
-    return { success: false, error: '未登录' }
+    return wrapResult(event, { success: false, error: '未登录' })
   }
 
   try {
+    let result
     switch (event.action) {
-      case 'listByDate':
-        return await listByDate(userId, event)
-      case 'create':
-        return await create(userId, event)
-      case 'toggle':
-        return await toggle(userId, event)
-      case 'delete':
-        return await remove(userId, event)
-      default:
-        return { success: false, error: `未知操作: ${event.action}` }
+      case 'listByDate': result = await listByDate(userId, event); break
+      case 'create': result = await create(userId, event); break
+      case 'toggle': result = await toggle(userId, event); break
+      case 'delete': result = await remove(userId, event); break
+      default: result = { success: false, error: `未知操作: ${event.action}` }
     }
+    return wrapResult(event, result)
   } catch (err) {
     console.error('[todo] 操作失败:', err)
-    return { success: false, error: '操作失败' }
+    return wrapResult(event, { success: false, error: '操作失败' })
   }
 }
 
@@ -49,19 +66,9 @@ async function listByDate(userId, event) {
 
 async function create(userId, event) {
   const { date, content, priority } = event
-  if (!date || !content) {
-    return { success: false, error: '日期和内容不能为空' }
-  }
+  if (!date || !content) return { success: false, error: '日期和内容不能为空' }
 
-  const doc = {
-    userId,
-    date,
-    content,
-    isDone: false,
-    priority: priority || 'medium',
-    createdAt: db.serverDate(),
-  }
-
+  const doc = { userId, date, content, isDone: false, priority: priority || 'medium', createdAt: db.serverDate() }
   const res = await db.collection('todos').add({ data: doc })
   return { success: true, data: { _id: res._id, ...doc } }
 }
@@ -71,14 +78,9 @@ async function toggle(userId, event) {
   if (!_id) return { success: false, error: '缺少待办 ID' }
 
   const doc = await db.collection('todos').doc(_id).get()
-  if (!doc.data || doc.data.userId !== userId) {
-    return { success: false, error: '待办不存在或无权操作' }
-  }
+  if (!doc.data || doc.data.userId !== userId) return { success: false, error: '待办不存在或无权操作' }
 
-  await db.collection('todos').doc(_id).update({
-    data: { isDone },
-  })
-
+  await db.collection('todos').doc(_id).update({ data: { isDone } })
   return { success: true, data: { _id, isDone } }
 }
 
@@ -87,9 +89,7 @@ async function remove(userId, event) {
   if (!_id) return { success: false, error: '缺少待办 ID' }
 
   const doc = await db.collection('todos').doc(_id).get()
-  if (!doc.data || doc.data.userId !== userId) {
-    return { success: false, error: '待办不存在或无权删除' }
-  }
+  if (!doc.data || doc.data.userId !== userId) return { success: false, error: '待办不存在或无权删除' }
 
   await db.collection('todos').doc(_id).remove()
   return { success: true }

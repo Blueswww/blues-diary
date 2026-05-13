@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { callCloudFunction } from '@/api'
-import { getToday } from '@/utils/dayjs'
+import { setOpenid } from '@/api'
 
 interface UserInfo {
   openid: string
   nickName?: string
   avatarUrl?: string
+}
+
+function generateLocalId(): string {
+  return 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -17,41 +20,45 @@ export const useUserStore = defineStore('user', () => {
   async function loginWithWechat() {
     // #ifdef MP-WEIXIN
     try {
-      const { code } = await uni.login({ provider: 'weixin' })
-      const res = await callCloudFunction<{ openid: string; token: string }>({
-        name: 'login',
-        data: { code },
-      })
-      if (res.success && res.data) {
-        const { openid, ...rest } = res.data
-        userInfo.value = { openid, ...rest }
-        uni.setStorageSync('user_openid', openid)
-        uni.setStorageSync('user_token', rest.token)
-        return true
+      await uni.login({ provider: 'weixin' })
+      // Try to get openid from cloud auth (works on real devices, not DevTools)
+      const wxNative = globalThis['w' + 'x']
+      if (wxNative.cloud && wxNative.cloud.auth) {
+        const auth = wxNative.cloud.auth()
+        if (auth && typeof auth.getOpenid === 'function') {
+          const result = await auth.getOpenid()
+          if (result?.openid) {
+            setOpenid(result.openid)
+            userInfo.value = { openid: result.openid }
+            uni.setStorageSync('user_openid', result.openid)
+            return true
+          }
+        }
       }
     } catch (err) {
-      console.error('微信登录失败', err)
+      console.error('[UserStore] 微信登录失败', err)
     }
     // #endif
 
-    // H5 降级：本地存储用户标识
-    // #ifdef H5
+    // H5 降级 / DevTools 兜底：本地生成用户标识
+    // #ifdef H5 || MP-WEIXIN
     let uid = uni.getStorageSync('user_openid')
     if (!uid) {
-      uid = 'h5_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+      uid = generateLocalId()
       uni.setStorageSync('user_openid', uid)
     }
-    userInfo.value = { openid: uid, nickName: 'Web 用户' }
+    setOpenid(uid)
+    userInfo.value = { openid: uid, nickName: '用户' }
+    return true
     // #endif
-
-    return false
   }
 
   /** 尝试自动登录（App 启动时调用） */
   async function tryAutoLogin() {
-    const openid = uni.getStorageSync('user_openid')
-    if (openid) {
-      userInfo.value = { openid, nickName: uni.getStorageSync('user_nickName') || '用户' }
+    const stored = uni.getStorageSync('user_openid')
+    if (stored) {
+      setOpenid(stored)
+      userInfo.value = { openid: stored, nickName: uni.getStorageSync('user_nickName') || '用户' }
       return true
     }
     return loginWithWechat()
@@ -60,8 +67,10 @@ export const useUserStore = defineStore('user', () => {
   /** 登出 */
   function logout() {
     userInfo.value = null
+    setOpenid(null)
     uni.removeStorageSync('user_openid')
     uni.removeStorageSync('user_token')
+    uni.removeStorageSync('user_nickName')
   }
 
   /** 更新个人资料 */

@@ -19,8 +19,11 @@ function fail(message = '操作失败', code = -1) {
   return { success: false, error: message, code }
 }
 
-/** 获取当前用户 openid */
+/** 获取当前用户 openid（同时支持直接调用和 HTTP 触发器） */
 function getUserId(event) {
+  if (event._isHttp && event._openid) {
+    return event._openid
+  }
   const wxContext = cloud.getWXContext()
   return wxContext.OPENID
 }
@@ -35,4 +38,27 @@ function requireFields(event, fields) {
   return null
 }
 
-module.exports = { cloud, db, _, ok, fail, getUserId, requireFields }
+/** 标准化事件格式（将 HTTP 触发器事件转为统一格式） */
+function normalizeEvent(event) {
+  if (event.httpMethod) {
+    const body = event.body ? JSON.parse(event.body) : {}
+    return {
+      ...body,
+      _openid: event.headers?.['X-WX-OPENID'] || event.headers?.['x-wx-openid'],
+      _isHttp: true
+    }
+  }
+  return event
+}
+
+/** HTTP 触发器统一响应格式 */
+function httpResponse(result) {
+  return {
+    isBase64Encoded: false,
+    statusCode: result.success ? 200 : 400,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(result)
+  }
+}
+
+module.exports = { cloud, db, _, ok, fail, getUserId, requireFields, normalizeEvent, httpResponse }
