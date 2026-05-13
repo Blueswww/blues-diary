@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.temp/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 环境配置
+.env
+.env.local

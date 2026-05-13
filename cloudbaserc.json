@@ -1,0 +1,31 @@
+{
+  "envId": "cloud1-d5gdqeljo6eacbfc2",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "login",
+      "timeout": 5,
+      "triggers": []
+    },
+    {
+      "name": "diary",
+      "timeout": 10,
+      "triggers": []
+    },
+    {
+      "name": "tag",
+      "timeout": 5,
+      "triggers": []
+    },
+    {
+      "name": "todo",
+      "timeout": 5,
+      "triggers": []
+    },
+    {
+      "name": "anniversary",
+      "timeout": 5,
+      "triggers": []
+    }
+  ]
+}
