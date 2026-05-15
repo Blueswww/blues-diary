@@ -13,7 +13,7 @@ defineProps<{
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .empty-state {
   display: flex;
   flex-direction: column;

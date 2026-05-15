@@ -41,6 +41,11 @@ export const useTagStore = defineStore('tag', () => {
     return ids.map(id => getTagById(id)?.name || '未知').filter(Boolean)
   }
 
+  function clearCache() {
+    tags.value = []
+    loading.value = false
+  }
+
   return {
     tags,
     loading,
@@ -49,5 +54,6 @@ export const useTagStore = defineStore('tag', () => {
     removeTag,
     getTagById,
     getTagNames,
+    clearCache,
   }
 })

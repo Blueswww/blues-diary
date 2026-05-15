@@ -1,5 +1,6 @@
 import { getDB, ok, fail } from './index'
 import type { CloudFunctionResult } from './types'
+import { decodeHtml } from '@/utils/decode'
 
 export interface DiaryRecord {
   _id: string
@@ -13,6 +14,36 @@ export interface DiaryRecord {
   updatedAt: string
 }
 
+export type DiaryCreateInput = {
+  date: string
+  content: string
+  mood?: string
+  weather?: string
+  images?: string[]
+  tags?: string[]
+}
+
+export type DiaryUpdateInput = {
+  _id: string
+  content?: string
+  mood?: string
+  weather?: string
+  images?: string[]
+  tags?: string[]
+}
+
+/** 解码日记内容（在 API 层统一处理） */
+function decodeDiary(d: DiaryRecord): DiaryRecord {
+  const decoded = decodeHtml(d.content)
+  if (d.content !== decoded) {
+    console.log('[API] decode:', JSON.stringify(d.content.slice(0, 80)), '→', JSON.stringify(decoded.slice(0, 80)))
+  }
+  return { ...d, content: decoded }
+}
+function decodeDiaries(data: DiaryRecord[]): DiaryRecord[] {
+  return data.map(d => decodeDiary(d))
+}
+
 const db = getDB()
 const collection = db.collection('diaries')
 
@@ -22,51 +53,27 @@ export async function getDiariesByDateRange(startDate: string, endDate: string):
     const res = await collection.where({
       date: db.command.gte(startDate).and(db.command.lt(endDate)),
     }).orderBy('date', 'desc').get()
-    return ok(res.data as DiaryRecord[])
+    return ok(decodeDiaries(res.data as DiaryRecord[]))
   } catch (err: any) {
     console.error('[API] getDiariesByDateRange:', err)
     return fail(err.message || '获取日记失败')
   }
 }
 
-/** 获取指定日期的日记 */
-export async function getDiaryByDate(date: string): Promise<CloudFunctionResult<DiaryRecord | null>> {
+/** 获取指定日期的所有日记（支持每天多条） */
+export async function getDiariesByDate(date: string): Promise<CloudFunctionResult<DiaryRecord[]>> {
   try {
-    const res = await collection.where({ date }).limit(1).get()
-    return ok((res.data[0] as DiaryRecord) || null)
+    const res = await collection.where({ date }).orderBy('createdAt', 'asc').get()
+    return ok(decodeDiaries(res.data as DiaryRecord[]))
   } catch (err: any) {
-    console.error('[API] getDiaryByDate:', err)
+    console.error('[API] getDiariesByDate:', err)
     return fail(err.message || '获取日记失败')
   }
 }
 
 /** 创建日记 */
-export async function createDiary(input: {
-  date: string
-  content: string
-  mood?: string
-  weather?: string
-  images?: string[]
-  tags?: string[]
-}): Promise<CloudFunctionResult<DiaryRecord>> {
+export async function createDiary(input: DiaryCreateInput): Promise<CloudFunctionResult<DiaryRecord>> {
   try {
-    // Check if diary already exists for this date
-    const existing = await collection.where({ date: input.date }).limit(1).get()
-    if (existing.data.length > 0) {
-      // Update existing
-      await collection.doc(existing.data[0]._id).update({
-        data: {
-          content: input.content,
-          mood: input.mood || '',
-          weather: input.weather || '',
-          images: input.images || [],
-          tags: input.tags || [],
-          updatedAt: db.serverDate(),
-        },
-      })
-      return ok({ ...existing.data[0], ...input } as unknown as DiaryRecord)
-    }
-    // Create new
     const doc = {
       date: input.date,
       content: input.content,
@@ -86,14 +93,7 @@ export async function createDiary(input: {
 }
 
 /** 更新日记 */
-export async function updateDiary(input: {
-  _id: string
-  content?: string
-  mood?: string
-  weather?: string
-  images?: string[]
-  tags?: string[]
-}): Promise<CloudFunctionResult<DiaryRecord>> {
+export async function updateDiary(input: DiaryUpdateInput): Promise<CloudFunctionResult<DiaryRecord>> {
   try {
     const updateData: Record<string, any> = { updatedAt: db.serverDate() }
     if (input.content !== undefined) updateData.content = input.content
@@ -104,7 +104,7 @@ export async function updateDiary(input: {
 
     await collection.doc(input._id).update({ data: updateData })
     const updated = await collection.doc(input._id).get()
-    return ok(updated.data as DiaryRecord)
+    return ok(decodeDiary(updated.data as DiaryRecord))
   } catch (err: any) {
     console.error('[API] updateDiary:', err)
     return fail(err.message || '更新日记失败')
@@ -128,7 +128,7 @@ export async function getDiariesByTag(tagId: string): Promise<CloudFunctionResul
     const res = await collection.where({
       tags: db.command.elemMatch(db.command.eq(tagId)),
     }).orderBy('date', 'desc').get()
-    return ok(res.data as DiaryRecord[])
+    return ok(decodeDiaries(res.data as DiaryRecord[]))
   } catch (err: any) {
     console.error('[API] getDiariesByTag:', err)
     return fail(err.message || '获取日记失败')

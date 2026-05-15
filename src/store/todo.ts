@@ -61,6 +61,12 @@ export const useTodoStore = defineStore('todo', () => {
     return { done, total, percent: total > 0 ? Math.round((done / total) * 100) : 0 }
   }
 
+  function clearCache() {
+    todos.value = []
+    todayTodos.value = []
+    loading.value = false
+  }
+
   return {
     todos,
     todayTodos,
@@ -70,5 +76,6 @@ export const useTodoStore = defineStore('todo', () => {
     toggleDone,
     removeTodo,
     todayProgress,
+    clearCache,
   }
 })

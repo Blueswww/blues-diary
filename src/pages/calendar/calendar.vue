@@ -5,9 +5,12 @@ import { useDiaryStore } from '@/store/diary'
 import { useAnniversaryStore } from '@/store/anniversary'
 import { getMonthDays, formatDate } from '@/utils/dayjs'
 import { getHoliday, getCommonAnniversary } from '@/utils/holidays'
+import { useTagStore } from '@/store/tag'
+import TagBadge from '@/components/TagBadge.vue'
 
 const diaryStore = useDiaryStore()
 const anniversaryStore = useAnniversaryStore()
+const tagStore = useTagStore()
 
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
@@ -15,7 +18,7 @@ const selectedDate = ref(formatDate(new Date(), 'YYYY-MM-DD'))
 
 const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value))
 
-const selectedDiary = computed(() => diaryStore.diaryMap[selectedDate.value])
+const selectedEntries = computed(() => diaryStore.diaryMap[selectedDate.value] || [])
 const selectedHoliday = computed(() => {
   return getHoliday(selectedDate.value) || getCommonAnniversary(
     parseInt(selectedDate.value.slice(5, 7)),
@@ -60,9 +63,9 @@ function goToday() {
   <view class="page">
     <!-- 月份导航 -->
     <view class="month-nav">
-      <text class="nav-arrow" @tap="changeMonth(-1)">&lt;</text>
+      <text class="nav-arrow" @tap="changeMonth(-1)">{{ '<' }}</text>
       <text class="month-title">{{ currentYear }}年{{ currentMonth }}月</text>
-      <text class="nav-arrow" @tap="changeMonth(1)">&gt;</text>
+      <text class="nav-arrow" @tap="changeMonth(1)">{{ '>' }}</text>
       <text class="today-btn" @tap="goToday">今天</text>
     </view>
 
@@ -101,24 +104,38 @@ function goToday() {
         <text class="detail-holiday" v-if="selectedHoliday">- {{ selectedHoliday }}</text>
       </view>
 
-      <view class="detail-body" v-if="selectedDiary">
-        <view class="detail-content">
-          <text>{{ selectedDiary.content.slice(0, 200) }}</text>
+      <view class="detail-body" v-if="selectedEntries.length">
+        <view class="detail-entry" v-for="entry in selectedEntries" :key="entry._id">
+          <view class="entry-mood" v-if="entry.mood">
+            <text>{{ entry.mood }}</text>
+          </view>
+          <view class="entry-preview">
+            <text>{{ entry.content }}</text>
+          </view>
+          <view class="entry-tags" v-if="entry.tags && entry.tags.length">
+            <TagBadge
+              v-for="tagId in entry.tags"
+              :key="tagId"
+              :name="tagStore.getTagById(tagId)?.name || ''"
+              :color="tagStore.getTagById(tagId)?.color"
+              size="small"
+            />
+          </view>
         </view>
         <view class="detail-footer">
-          <text class="read-more" @tap="uni.navigateTo({ url: `/pages/diary/diary?date=${selectedDate}` })">查看完整日记 &gt;</text>
+          <text class="read-more" @tap="uni.navigateTo({ url: `/pages/diary/diary?date=${selectedDate}` })">查看全部 {{ '>' }}</text>
         </view>
       </view>
 
-      <view class="detail-empty" v-else>
-        <text class="empty-text">今天还没有日记</text>
-        <view class="btn-small" @tap="goWriteDiary(selectedDate)">写一篇</view>
+      <view class="detail-empty">
+        <text class="empty-text">{{ selectedEntries.length ? '还可以再写一条' : '今天还没有日记' }}</text>
+        <view class="btn-small" @tap="goWriteDiary(selectedDate)">写日记</view>
       </view>
     </view>
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .page { padding-top: 24rpx; padding-bottom: 40rpx; }
 .month-nav {
   display: flex;
@@ -189,6 +206,14 @@ function goToday() {
   .detail-footer { margin-top: 16rpx; .read-more { font-size: 26rpx; color: $primary-color; } }
   .detail-empty { margin-top: 16rpx; display: flex; align-items: center; gap: 20rpx;
     .empty-text { font-size: 26rpx; color: $text-light; }
+  }
+  .detail-entry {
+    padding: 12rpx 0;
+    border-bottom: 2rpx solid $border-color;
+    &:last-child { border-bottom: none; }
+    .entry-mood { margin-bottom: 4rpx; text { font-size: 32rpx; } }
+    .entry-preview { margin-bottom: 6rpx; text { font-size: 26rpx; color: $text-secondary; line-height: 1.6; } }
+    .entry-tags { display: flex; flex-wrap: wrap; gap: 8rpx; }
   }
 }
 </style>

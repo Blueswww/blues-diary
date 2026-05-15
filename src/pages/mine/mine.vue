@@ -4,18 +4,22 @@ import { ref } from 'vue'
 import { useUserStore } from '@/store/user'
 import { useDiaryStore } from '@/store/diary'
 import { useTodoStore } from '@/store/todo'
+import { useTagStore } from '@/store/tag'
+import { useAnniversaryStore } from '@/store/anniversary'
 
 const userStore = useUserStore()
 const diaryStore = useDiaryStore()
 const todoStore = useTodoStore()
+const tagStore = useTagStore()
+const anniversaryStore = useAnniversaryStore()
 
 const diaryCount = ref(0)
 const weekStreak = ref(0)
 const version = ref('1.0.0')
 
 onShow(() => {
-  diaryCount.value = Object.keys(diaryStore.diaryMap).length
-  weekStreak.value = diaryStore.weekStreak || 0
+  diaryCount.value = Object.values(diaryStore.diaryMap).reduce((sum, arr) => sum + arr.length, 0)
+  weekStreak.value = diaryStore.weekStreak
 })
 
 function goToTags() {
@@ -33,6 +37,10 @@ function handleLogout() {
     success: (res) => {
       if (res.confirm) {
         userStore.logout()
+        diaryStore.clearCache()
+        tagStore.clearCache()
+        todoStore.clearCache()
+        anniversaryStore.clearCache()
       }
     },
   })
@@ -84,12 +92,12 @@ function handleLogin() {
       <view class="menu-item" @tap="goToTags">
         <text class="menu-icon">🏷️</text>
         <text class="menu-label">标签管理</text>
-        <text class="menu-arrow">&gt;</text>
+        <text class="menu-arrow">{{ '>' }}</text>
       </view>
       <view class="menu-item" @tap="goToAnniversaries">
         <text class="menu-icon">🎉</text>
         <text class="menu-label">纪念日</text>
-        <text class="menu-arrow">&gt;</text>
+        <text class="menu-arrow">{{ '>' }}</text>
       </view>
     </view>
 
@@ -105,7 +113,7 @@ function handleLogin() {
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .page { padding-top: 24rpx; }
 .login-prompt {
   display: flex;

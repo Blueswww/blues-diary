@@ -106,7 +106,7 @@ function countDays(targetDate: string): string {
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .page { padding-top: 24rpx; }
 .header-actions { padding: 0 32rpx 24rpx; display: flex; justify-content: flex-end; }
 .form-area {

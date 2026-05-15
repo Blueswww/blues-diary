@@ -32,7 +32,7 @@ function getTagColor(tagId: string): string {
     </view>
 
     <view class="content-preview">
-      <text class="content" decode="{{true}}">{{ diary.content.replace(/<[^>]*>/g, '').slice(0, 200) }}</text>
+      <text class="content">{{ diary.content }}</text>
     </view>
 
     <view class="tags-row" v-if="diary.tags && diary.tags.length">
@@ -46,7 +46,7 @@ function getTagColor(tagId: string): string {
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .diary-card {
   .card-header {
     display: flex;
@@ -65,11 +65,6 @@ function getTagColor(tagId: string): string {
       font-size: 28rpx;
       color: $text-secondary;
       line-height: 1.7;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 4;
-      -webkit-box-orient: vertical;
     }
   }
   .tags-row {

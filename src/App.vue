@@ -32,5 +32,13 @@ onHide(() => {
 </template>
 
 <style lang="scss">
-/* 全局样式在 uni.scss 中定义 */
+/* 全局重置 */
+page {
+  background-color: $bg-color;
+  color: $text-primary;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
 </style>

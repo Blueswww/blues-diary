@@ -53,6 +53,11 @@ export const useAnniversaryStore = defineStore('anniversary', () => {
     return false
   }
 
+  function clearCache() {
+    anniversaries.value = []
+    loading.value = false
+  }
+
   return {
     anniversaries,
     upcomingAnniversaries,
@@ -60,5 +65,6 @@ export const useAnniversaryStore = defineStore('anniversary', () => {
     loadAnniversaries,
     addAnniversary,
     removeAnniversary,
+    clearCache,
   }
 })

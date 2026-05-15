@@ -46,11 +46,11 @@ const progress = () => todoStore.todayProgress()
   <view class="page">
     <!-- 日期切换 -->
     <view class="date-nav">
-      <text class="nav-btn" @tap="changeDate(-1)">&lt; 前一天</text>
+      <text class="nav-btn" @tap="changeDate(-1)">{{ '<' }} 前一天</text>
       <view class="current-date">
         <text class="date">{{ activeDate }}</text>
       </view>
-      <text class="nav-btn" @tap="changeDate(1)">后一天 &gt;</text>
+      <text class="nav-btn" @tap="changeDate(1)">后一天 {{ '>' }}</text>
     </view>
 
     <!-- 今日进度 -->
@@ -93,7 +93,7 @@ const progress = () => todoStore.todayProgress()
   </view>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .page { padding-top: 24rpx; }
 .date-nav {
   display: flex;

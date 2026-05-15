@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   getDiariesByDateRange,
-  getDiaryByDate,
+  getDiariesByDate,
   createDiary,
   updateDiary,
   deleteDiary,
@@ -11,17 +11,32 @@ import {
   type DiaryCreateInput,
   type DiaryUpdateInput,
 } from '@/api/diary'
-import { getToday } from '@/utils/dayjs'
+import dayjs from '@/utils/dayjs'
 
 export const useDiaryStore = defineStore('diary', () => {
-  // 当月日记缓存（key: YYYY-MM-DD, value: 日记）
-  const diaryMap = ref<Record<string, DiaryRecord>>({})
-  const diaryList = ref<DiaryRecord[]>([])   // 用于列表展示
-  const currentDiary = ref<DiaryRecord | null>(null)
+  // 当月日记缓存（key: YYYY-MM-DD, value: 该天所有日记条目）
+  const diaryMap = ref<Record<string, DiaryRecord[]>>({})
+  const diaryList = ref<DiaryRecord[]>([])   // 平铺列表，用于首页展示
+  const currentEntries = ref<DiaryRecord[]>([])  // 当前选中日期的所有条目
   const loading = ref(false)
 
-  /** 加载某月有日记的日期（日历标记用） */
+  /** 有日记的日期集合（日历标记用） */
   const diaryDates = ref<Set<string>>(new Set())
+
+  /** 连续写日记天数 */
+  const weekStreak = computed(() => {
+    let count = 0
+    const today = dayjs()
+    for (let i = 0; i < 365; i++) {
+      const d = today.subtract(i, 'day').format('YYYY-MM-DD')
+      if (diaryDates.value.has(d)) {
+        count++
+      } else {
+        break
+      }
+    }
+    return count
+  })
 
   /** 获取指定日期范围内的日记 */
   async function loadDiariesByMonth(year: number, month: number) {
@@ -31,43 +46,50 @@ export const useDiaryStore = defineStore('diary', () => {
 
     const res = await getDiariesByDateRange(startDate, endDate)
     if (res.success && res.data) {
+      const newMap: Record<string, DiaryRecord[]> = {}
+      const newDates = new Set<string>()
       res.data.forEach(d => {
-        diaryMap.value[d.date] = d
-        diaryDates.value.add(d.date)
+        if (!newMap[d.date]) newMap[d.date] = []
+        newMap[d.date].push(d)
+        newDates.add(d.date)
       })
+      diaryMap.value = newMap
+      diaryDates.value = newDates
       diaryList.value = res.data
     }
     loading.value = false
   }
 
-  /** 获取指定日期的日记 */
-  async function loadDiaryByDate(date: string) {
+  /** 获取指定日期的所有日记 */
+  async function loadDiariesByDate(date: string): Promise<DiaryRecord[]> {
     if (diaryMap.value[date]) {
-      currentDiary.value = diaryMap.value[date]
+      currentEntries.value = diaryMap.value[date]
       return diaryMap.value[date]
     }
 
     loading.value = true
-    const res = await getDiaryByDate(date)
+    const res = await getDiariesByDate(date)
     if (res.success && res.data) {
       diaryMap.value[date] = res.data
-      currentDiary.value = res.data
-      diaryDates.value.add(date)
+      currentEntries.value = res.data
+      if (res.data.length > 0) diaryDates.value.add(date)
       loading.value = false
       return res.data
     }
-    currentDiary.value = null
+    currentEntries.value = []
     loading.value = false
-    return null
+    return []
   }
 
   /** 创建日记 */
   async function addDiary(input: DiaryCreateInput) {
     const res = await createDiary(input)
     if (res.success && res.data) {
-      diaryMap.value[input.date] = res.data
+      if (!diaryMap.value[input.date]) diaryMap.value[input.date] = []
+      diaryMap.value[input.date].push(res.data)
       diaryDates.value.add(input.date)
       diaryList.value.unshift(res.data)
+      currentEntries.value = diaryMap.value[input.date]
       return true
     }
     return false
@@ -77,10 +99,21 @@ export const useDiaryStore = defineStore('diary', () => {
   async function editDiary(input: DiaryUpdateInput) {
     const res = await updateDiary(input)
     if (res.success && res.data) {
-      diaryMap.value[res.data.date] = res.data
-      if (currentDiary.value?._id === res.data._id) {
-        currentDiary.value = res.data
+      const idx = diaryList.value.findIndex(d => d._id === input._id)
+      if (idx >= 0) diaryList.value[idx] = res.data
+
+      for (const date in diaryMap.value) {
+        const arr = diaryMap.value[date]
+        const i = arr.findIndex(d => d._id === input._id)
+        if (i >= 0) {
+          arr[i] = res.data
+          break
+        }
       }
+
+      const ci = currentEntries.value.findIndex(d => d._id === input._id)
+      if (ci >= 0) currentEntries.value[ci] = res.data
+
       return true
     }
     return false
@@ -90,18 +123,20 @@ export const useDiaryStore = defineStore('diary', () => {
   async function removeDiary(id: string) {
     const res = await deleteDiary(id)
     if (res.success) {
-      // 从缓存中移除
       for (const date in diaryMap.value) {
-        if (diaryMap.value[date]._id === id) {
-          diaryDates.value.delete(date)
-          delete diaryMap.value[date]
+        const arr = diaryMap.value[date]
+        const idx = arr.findIndex(d => d._id === id)
+        if (idx >= 0) {
+          arr.splice(idx, 1)
+          if (arr.length === 0) {
+            delete diaryMap.value[date]
+            diaryDates.value.delete(date)
+          }
           break
         }
       }
       diaryList.value = diaryList.value.filter(d => d._id !== id)
-      if (currentDiary.value?._id === id) {
-        currentDiary.value = null
-      }
+      currentEntries.value = currentEntries.value.filter(d => d._id !== id)
       return true
     }
     return false
@@ -117,6 +152,15 @@ export const useDiaryStore = defineStore('diary', () => {
     loading.value = false
   }
 
+  /** 清空缓存（退出登录时调用） */
+  function clearCache() {
+    diaryMap.value = {}
+    diaryList.value = []
+    currentEntries.value = []
+    diaryDates.value = new Set()
+    loading.value = false
+  }
+
   /** 检查某天是否有日记 */
   function hasDiary(date: string): boolean {
     return diaryDates.value.has(date)
@@ -125,14 +169,16 @@ export const useDiaryStore = defineStore('diary', () => {
   return {
     diaryMap,
     diaryList,
-    currentDiary,
+    currentEntries,
     diaryDates,
+    weekStreak,
     loading,
     loadDiariesByMonth,
-    loadDiaryByDate,
+    loadDiariesByDate,
     addDiary,
     editDiary,
     removeDiary,
+    clearCache,
     loadDiariesByTag,
     hasDiary,
   }
