@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
+import { useUserStore } from '@/store/user'
 import { useTodoStore } from '@/store/todo'
 import { getToday } from '@/utils/dayjs'
 import EmptyState from '@/components/EmptyState.vue'
 
+const userStore = useUserStore()
 const todoStore = useTodoStore()
 const newContent = ref('')
 const activeDate = ref(getToday())
+const expandedId = ref('')
 
 onShow(() => {
+  if (!userStore.isLoggedIn) {
+    todoStore.clearCache()
+    return
+  }
   loadTodos()
 })
 
@@ -17,7 +24,16 @@ function loadTodos() {
   todoStore.loadTodosByDate(activeDate.value)
 }
 
+function requireLogin(): boolean {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return false
+  }
+  return true
+}
+
 async function addTodo() {
+  if (!requireLogin()) return
   const content = newContent.value.trim()
   if (!content) return
   await todoStore.addTodo(activeDate.value, content)
@@ -25,11 +41,17 @@ async function addTodo() {
 }
 
 async function toggle(todoId: string, done: boolean) {
+  if (!requireLogin()) return
   await todoStore.toggleDone(todoId, done)
 }
 
 async function removeTodo(todoId: string) {
+  if (!requireLogin()) return
   await todoStore.removeTodo(todoId)
+}
+
+function toggleExpand(todoId: string) {
+  expandedId.value = expandedId.value === todoId ? '' : todoId
 }
 
 function changeDate(days: number) {
@@ -54,7 +76,7 @@ const progress = () => todoStore.todayProgress()
     </view>
 
     <!-- 今日进度 -->
-    <view class="progress-bar card" v-if="activeDate === getToday()">
+    <view class="progress-bar card" v-if="activeDate === getToday() && userStore.isLoggedIn">
       <text class="progress-text">今日完成：{{ todoStore.todayProgress().done }}/{{ todoStore.todayProgress().total }}</text>
       <view class="progress-track">
         <view class="progress-fill" :style="{ width: todoStore.todayProgress().percent + '%' }"></view>
@@ -74,17 +96,21 @@ const progress = () => todoStore.todayProgress()
     </view>
 
     <!-- 待办列表 -->
-    <view class="todo-list" v-if="todoStore.todos.length">
+    <view class="todo-list" v-if="todoStore.todos.length && userStore.isLoggedIn">
       <view
         class="todo-item card"
+        :class="{ expanded: expandedId === todo._id }"
         v-for="todo in todoStore.todos"
         :key="todo._id"
-        @tap="toggle(todo._id, !todo.isDone)"
+        @tap="toggleExpand(todo._id)"
       >
-        <view class="checkbox" :class="{ checked: todo.isDone }">
+        <view class="checkbox" :class="{ checked: todo.isDone }" @tap.stop="toggle(todo._id, !todo.isDone)">
           <text v-if="todo.isDone">✓</text>
         </view>
-        <text class="todo-content" :class="{ done: todo.isDone }">{{ todo.content }}</text>
+        <view class="todo-body">
+          <text class="todo-content" :class="{ done: todo.isDone }">{{ todo.content }}</text>
+          <text class="todo-time" v-if="expandedId === todo._id">{{ todo.createdAt || '' }}</text>
+        </view>
         <text class="delete-todo" @tap.stop="removeTodo(todo._id)">✕</text>
       </view>
     </view>
@@ -126,13 +152,27 @@ const progress = () => todoStore.todayProgress()
   display: flex;
   gap: 16rpx;
   padding: 0 32rpx 24rpx;
-  .input-field { flex: 1; }
+  .input-field {
+    flex: 1;
+    height: 72rpx;
+    padding: 0 24rpx;
+    font-size: 28rpx;
+    color: $text-primary;
+    background: $card-bg;
+    border: 2rpx solid $border-color;
+    border-radius: 16rpx;
+  }
   .add-btn { flex-shrink: 0; }
 }
 .todo-item {
   display: flex;
   align-items: center;
   gap: 20rpx;
+  transition: background 0.2s;
+  &.expanded {
+    background: $primary-light;
+    .todo-body .todo-content { font-weight: 600; }
+  }
   .checkbox {
     width: 40rpx;
     height: 40rpx;
@@ -149,12 +189,22 @@ const progress = () => todoStore.todayProgress()
       border-color: $success-color;
     }
   }
-  .todo-content {
+  .todo-body {
     flex: 1;
-    font-size: 28rpx;
-    &.done {
-      text-decoration: line-through;
+    min-width: 0;
+    .todo-content {
+      font-size: 28rpx;
+      display: block;
+      &.done {
+        text-decoration: line-through;
+        color: $text-light;
+      }
+    }
+    .todo-time {
+      font-size: 22rpx;
       color: $text-light;
+      margin-top: 8rpx;
+      display: block;
     }
   }
   .delete-todo {

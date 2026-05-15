@@ -30,6 +30,8 @@ function goToAnniversaries() {
   uni.navigateTo({ url: '/pages/anniversary/anniversary' })
 }
 
+const isLoggingIn = ref(false)
+
 function handleLogout() {
   uni.showModal({
     title: '退出',
@@ -46,8 +48,17 @@ function handleLogout() {
   })
 }
 
-function handleLogin() {
-  userStore.loginWithWechat()
+async function handleLogin() {
+  isLoggingIn.value = true
+  const ok = await userStore.loginWithWechat()
+  isLoggingIn.value = false
+  if (!ok) {
+    uni.showToast({
+      title: userStore.loginError || '登录失败，请重试',
+      icon: 'none',
+      duration: 3000,
+    })
+  }
 }
 </script>
 
@@ -58,7 +69,9 @@ function handleLogin() {
       <text class="login-icon">👤</text>
       <text class="login-title">未登录</text>
       <text class="login-desc">登录后可同步数据到云端</text>
-      <button class="login-btn" @tap="handleLogin">微信一键登录</button>
+      <button class="login-btn" :class="{ loading: isLoggingIn }" :disabled="isLoggingIn" @tap="handleLogin">
+        {{ isLoggingIn ? '登录中...' : '微信一键登录' }}
+      </button>
     </view>
 
     <!-- 用户信息（已登录） -->

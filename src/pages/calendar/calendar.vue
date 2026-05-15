@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
 import { ref, computed } from 'vue'
+import { useUserStore } from '@/store/user'
 import { useDiaryStore } from '@/store/diary'
 import { useAnniversaryStore } from '@/store/anniversary'
 import { getMonthDays, formatDate } from '@/utils/dayjs'
-import { getHoliday, getCommonAnniversary } from '@/utils/holidays'
 import { useTagStore } from '@/store/tag'
+import { useHolidayStore } from '@/store/holiday'
 import TagBadge from '@/components/TagBadge.vue'
 
+const userStore = useUserStore()
 const diaryStore = useDiaryStore()
 const anniversaryStore = useAnniversaryStore()
 const tagStore = useTagStore()
+const holidayStore = useHolidayStore()
 
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
@@ -20,20 +23,26 @@ const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.va
 
 const selectedEntries = computed(() => diaryStore.diaryMap[selectedDate.value] || [])
 const selectedHoliday = computed(() => {
-  return getHoliday(selectedDate.value) || getCommonAnniversary(
+  return holidayStore.getHolidayName(selectedDate.value) || holidayStore.getCommonAnniversaryName(
     parseInt(selectedDate.value.slice(5, 7)),
     parseInt(selectedDate.value.slice(8, 10))
   )
 })
 
-onShow(() => {
-  loadMonthData()
-})
-
 async function loadMonthData() {
+  if (!userStore.isLoggedIn) {
+    diaryStore.clearCache()
+    anniversaryStore.clearCache()
+    return
+  }
   await diaryStore.loadDiariesByMonth(currentYear.value, currentMonth.value)
   await anniversaryStore.loadAnniversaries()
 }
+
+onShow(() => {
+  loadMonthData()
+  holidayStore.loadHolidays()
+})
 
 function changeMonth(delta: number) {
   currentMonth.value += delta
@@ -47,6 +56,10 @@ function selectDate(date: string) {
 }
 
 function goWriteDiary(date: string) {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
   uni.navigateTo({ url: `/pages/diary/diary?date=${date}` })
 }
 
@@ -89,9 +102,7 @@ function goToday() {
         @tap="selectDate(day.date)"
       >
         <text class="day-number">{{ day.day }}</text>
-        <view class="day-indicator" v-if="getHoliday(day.date)">
-          <text class="holiday-dot">·</text>
-        </view>
+        <text class="holiday-label" v-if="holidayStore.getHolidayName(day.date)">{{ holidayStore.getHolidayName(day.date)?.slice(0, 2) }}</text>
         <view class="diary-dot" v-if="diaryStore.hasDiary(day.date)"></view>
       </view>
     </view>
@@ -170,7 +181,7 @@ function goToday() {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12rpx 0;
+    padding: 6rpx 0;
     border-radius: 16rpx;
     position: relative;
     &.other-month { opacity: 0.3; }
@@ -178,7 +189,11 @@ function goToday() {
       background: $primary-light;
       .day-number { color: $primary-color; font-weight: 700; }
     }
-    &.selected { background: $primary-color; .day-number { color: #fff; font-weight: 700; } }
+    &.selected {
+      background: $primary-color;
+      .day-number { color: #fff; font-weight: 700; }
+      .holiday-label { color: rgba(255,255,255,0.85); }
+    }
     .day-number { font-size: 28rpx; }
     .diary-dot {
       width: 8rpx;
@@ -187,11 +202,11 @@ function goToday() {
       background: $primary-color;
       margin-top: 4rpx;
     }
-    .day-indicator {
-      position: absolute;
-      top: 4rpx;
-      right: 4rpx;
-      .holiday-dot { color: $danger-color; font-size: 20rpx; }
+    .holiday-label {
+      font-size: 18rpx;
+      color: $danger-color;
+      line-height: 1.2;
+      margin-top: 2rpx;
     }
   }
 }

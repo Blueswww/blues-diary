@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
+import { useUserStore } from '@/store/user'
 import { useTagStore } from '@/store/tag'
 import { useDiaryStore } from '@/store/diary'
 import EmptyState from '@/components/EmptyState.vue'
 
+const userStore = useUserStore()
 const tagStore = useTagStore()
 const diaryStore = useDiaryStore()
 
@@ -13,10 +15,23 @@ const newTagName = ref('')
 const tagColors = ['#5B7FFF', '#FF6B6B', '#34C759', '#FF9500', '#AF52DE', '#FFD60A']
 
 onShow(() => {
+  if (!userStore.isLoggedIn) {
+    tagStore.clearCache()
+    return
+  }
   tagStore.loadTags()
 })
 
+function requireLogin(): boolean {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return false
+  }
+  return true
+}
+
 async function createTag() {
+  if (!requireLogin()) return
   const name = newTagName.value.trim()
   if (!name) {
     uni.showToast({ title: '请输入标签名', icon: 'none' })
@@ -32,6 +47,7 @@ async function createTag() {
 }
 
 async function deleteTag(id: string, name: string) {
+  if (!requireLogin()) return
   uni.showModal({
     title: '删除标签',
     content: `确定删除「${name}」吗？`,
@@ -51,13 +67,13 @@ function viewTagDiaries(tagId: string) {
 
 <template>
   <view class="page">
-    <view class="header-actions">
+    <view class="header-actions" v-if="userStore.isLoggedIn">
       <view class="btn-small" @tap="showInput = !showInput">
         {{ showInput ? '取消' : '+ 新建标签' }}
       </view>
     </view>
 
-    <view class="input-area" v-if="showInput">
+    <view class="input-area" v-if="showInput && userStore.isLoggedIn">
       <input
         class="input-field"
         v-model="newTagName"
@@ -69,7 +85,7 @@ function viewTagDiaries(tagId: string) {
       <view class="btn-primary" @tap="createTag">创建</view>
     </view>
 
-    <view class="tag-list" v-if="tagStore.tags.length">
+    <view class="tag-list" v-if="tagStore.tags.length && userStore.isLoggedIn">
       <view
         class="tag-item card"
         v-for="tag in tagStore.tags"
@@ -80,7 +96,7 @@ function viewTagDiaries(tagId: string) {
           <view class="tag-dot" :style="{ backgroundColor: tag.color }"></view>
           <text class="tag-name">{{ tag.name }}</text>
         </view>
-        <view class="tag-right">
+        <view class="tag-right" v-if="userStore.isLoggedIn">
           <text class="delete-btn" @tap.stop="deleteTag(tag._id, tag.name)">删除</text>
         </view>
       </view>

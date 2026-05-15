@@ -8,66 +8,62 @@ interface UserInfo {
   avatarUrl?: string
 }
 
-function generateLocalId(): string {
-  return 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
-}
-
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null)
   const isLoggedIn = computed(() => !!userInfo.value)
+  const loginError = ref<string | null>(null)
 
-  /** 微信小程序登录 */
-  async function loginWithWechat() {
+  /** 微信小程序登录：调用 login 云函数获取真实 openid */
+  async function loginWithWechat(): Promise<boolean> {
+    loginError.value = null
+
     // #ifdef MP-WEIXIN
     try {
-      await uni.login({ provider: 'weixin' })
-      // Try to get openid from cloud auth (works on real devices, not DevTools)
       const wxNative = globalThis['w' + 'x']
-      if (wxNative.cloud && wxNative.cloud.auth) {
-        const auth = wxNative.cloud.auth()
-        if (auth && typeof auth.getOpenid === 'function') {
-          const result = await auth.getOpenid()
-          if (result?.openid) {
-            setOpenid(result.openid)
-            userInfo.value = { openid: result.openid }
-            uni.setStorageSync('user_openid', result.openid)
-            return true
-          }
-        }
+      const res = await wxNative.cloud.callFunction({ name: 'login' })
+      if (res.result?.success && res.result.data?.openid) {
+        const openid = res.result.data.openid
+        const nickName = res.result.data.nickName || '用户'
+        setOpenid(openid)
+        userInfo.value = { openid, nickName }
+        uni.setStorageSync('user_openid', openid)
+        uni.setStorageSync('user_nickName', nickName)
+        return true
       }
-    } catch (err) {
-      console.error('[UserStore] 微信登录失败', err)
+      loginError.value = res.result?.error || '登录失败：云函数返回异常'
+      return false
+    } catch (err: any) {
+      console.error('[UserStore] 云函数登录失败', err)
+      loginError.value = '登录失败：无法调用云函数（' + (err.errMsg || err.message || '未知错误') + '）'
+      return false
     }
     // #endif
 
-    // H5 降级 / DevTools 兜底：本地生成用户标识
-    // #ifdef H5 || MP-WEIXIN
-    let uid = uni.getStorageSync('user_openid')
-    if (!uid) {
-      uid = generateLocalId()
-      uni.setStorageSync('user_openid', uid)
-    }
-    setOpenid(uid)
-    userInfo.value = { openid: uid, nickName: '用户' }
-    return true
+    // #ifdef H5
+    loginError.value = 'H5 端暂不支持微信登录'
+    return false
     // #endif
   }
 
-  /** 尝试自动登录（App 启动时调用） */
-  async function tryAutoLogin() {
+  /** 尝试自动登录（App 启动时从缓存恢复） */
+  async function tryAutoLogin(): Promise<boolean> {
     const stored = uni.getStorageSync('user_openid')
     if (stored) {
       setOpenid(stored)
-      userInfo.value = { openid: stored, nickName: uni.getStorageSync('user_nickName') || '用户' }
+      userInfo.value = {
+        openid: stored,
+        nickName: uni.getStorageSync('user_nickName') || '用户',
+      }
       return true
     }
-    return loginWithWechat()
+    return false // 无缓存，让页面引导用户主动点击登录
   }
 
   /** 登出 */
   function logout() {
     userInfo.value = null
     setOpenid(null)
+    loginError.value = null
     uni.removeStorageSync('user_openid')
     uni.removeStorageSync('user_token')
     uni.removeStorageSync('user_nickName')
@@ -85,6 +81,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     userInfo,
     isLoggedIn,
+    loginError,
     loginWithWechat,
     tryAutoLogin,
     logout,

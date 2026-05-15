@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
+import { useUserStore } from '@/store/user'
 import { useDiaryStore } from '@/store/diary'
 import { useTagStore } from '@/store/tag'
 import { getToday } from '@/utils/dayjs'
@@ -9,6 +10,7 @@ import TagBadge from '@/components/TagBadge.vue'
 
 const diaryStore = useDiaryStore()
 const tagStore = useTagStore()
+const userStore = useUserStore()
 
 const date = ref(getToday())
 const entries = ref<DiaryRecord[]>([])
@@ -27,6 +29,7 @@ const moods = ['😊', '😢', '😡', '😴', '🥰', '🤔', '💪', '😌', '
 
 onLoad(async (query) => {
   if (query.date) date.value = query.date
+  if (!userStore.isLoggedIn) return
   await tagStore.loadTags()
   await loadEntries()
 })
@@ -38,8 +41,17 @@ async function loadEntries() {
   loading.value = false
 }
 
+function requireLogin(): boolean {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return false
+  }
+  return true
+}
+
 /** 打开新建表单 */
 function openNewEntry() {
+  if (!requireLogin()) return
   editTarget.value = null
   editorContent.value = ''
   editorMood.value = ''
@@ -49,6 +61,7 @@ function openNewEntry() {
 
 /** 打开编辑表单 */
 function openEditEntry(entry: DiaryRecord) {
+  if (!requireLogin()) return
   editTarget.value = entry
   editorContent.value = entry.content
   editorMood.value = entry.mood || ''
@@ -101,6 +114,7 @@ async function handleSave() {
 }
 
 async function handleDelete(entry: DiaryRecord) {
+  if (!requireLogin()) return
   uni.showModal({
     title: '确认删除',
     content: '删除后无法恢复，确定要删除这条日记吗？',

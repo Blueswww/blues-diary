@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "dayjs": "^1.11.0",
+    "lunar-javascript": "^1.7.7",
     "pinia": "^2.1.0",
     "vue": "^3.4.0"
   },

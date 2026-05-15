@@ -22,11 +22,8 @@ export const useTodoStore = defineStore('todo', () => {
 
   async function addTodo(date: string, content: string, priority: 'low' | 'medium' | 'high' = 'medium') {
     const res = await createTodo(date, content, priority)
-    if (res.success && res.data) {
-      todos.value.push(res.data)
-      if (date === getToday()) {
-        todayTodos.value.push(res.data)
-      }
+    if (res.success) {
+      await loadTodosByDate(date)
       return true
     }
     return false

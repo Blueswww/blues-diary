@@ -1,25 +1,36 @@
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
 import { ref, computed } from 'vue'
+import { useUserStore } from '@/store/user'
 import { useDiaryStore } from '@/store/diary'
 import { useTagStore } from '@/store/tag'
 import { useTodoStore } from '@/store/todo'
 import { useAnniversaryStore } from '@/store/anniversary'
 import { getToday, formatDate } from '@/utils/dayjs'
-import { getHoliday } from '@/utils/holidays'
+import { useHolidayStore } from '@/store/holiday'
 import TagBadge from '@/components/TagBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import type { DiaryRecord } from '@/api/diary'
 
+const userStore = useUserStore()
 const diaryStore = useDiaryStore()
 const tagStore = useTagStore()
 const todoStore = useTodoStore()
 const anniversaryStore = useAnniversaryStore()
+const holidayStore = useHolidayStore()
 
 const currentDate = ref(getToday())
 const selectedTag = ref<string | null>(null)
 
-const holiday = computed(() => getHoliday(currentDate.value))
+const holiday = computed(() => holidayStore.getHolidayName(currentDate.value))
+
+async function toggleTodoDone(id: string, done: boolean) {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
+  await todoStore.toggleDone(id, done)
+}
 
 // 日记列表（按标签筛选或全部）
 const displayDiaries = computed(() => {
@@ -97,6 +108,14 @@ onShow(() => {
 })
 
 async function loadData() {
+  holidayStore.loadHolidays()
+  if (!userStore.isLoggedIn) {
+    diaryStore.clearCache()
+    tagStore.clearCache()
+    todoStore.clearCache()
+    anniversaryStore.clearCache()
+    return
+  }
   const today = new Date()
   await Promise.all([
     diaryStore.loadDiariesByMonth(today.getFullYear(), today.getMonth() + 1),
@@ -107,6 +126,10 @@ async function loadData() {
 }
 
 function goWriteDiary() {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
   uni.navigateTo({ url: `/pages/diary/diary?date=${currentDate.value}` })
 }
 
@@ -147,6 +170,23 @@ function clearTagFilter() {
         <text class="brief-text">
           今日待办 {{ todoStore.todayProgress().done }}/{{ todoStore.todos.length }}
         </text>
+      </view>
+    </view>
+
+    <!-- 今日待办列表 -->
+    <view class="todo-brief card" v-if="todoStore.todayTodos.length">
+      <view
+        class="todo-row"
+        v-for="todo in todoStore.todayTodos"
+        :key="todo._id"
+        @tap="toggleTodoDone(todo._id, !todo.isDone)"
+      >
+        <view class="todo-check" :class="{ checked: todo.isDone }">
+          <text v-if="todo.isDone" class="check-mark">✓</text>
+        </view>
+        <view class="todo-body">
+          <text class="todo-text" :class="{ done: todo.isDone }">{{ todo.content }}</text>
+        </view>
       </view>
     </view>
 
@@ -250,6 +290,37 @@ function clearTagFilter() {
     &:last-child { margin-bottom: 0; }
     .brief-icon { font-size: 28rpx; }
     .brief-text { font-size: 26rpx; color: $text-secondary; }
+  }
+}
+.todo-brief {
+  padding: 8rpx 32rpx;
+  .todo-row {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    padding: 14rpx 0;
+    border-bottom: 2rpx solid $border-color;
+    &:last-child { border-bottom: none; }
+    .todo-check {
+      width: 36rpx; height: 36rpx;
+      border-radius: 50%;
+      border: 3rpx solid $border-color;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      &.checked { background: $success-color; border-color: $success-color; }
+      .check-mark { font-size: 22rpx; color: #fff; font-weight: 700; }
+    }
+    .todo-body {
+      flex: 1;
+      min-width: 0;
+      .todo-text {
+        font-size: 26rpx;
+        display: block;
+        &.done { text-decoration: line-through; color: $text-light; }
+      }
+    }
   }
 }
 .tag-filter {
