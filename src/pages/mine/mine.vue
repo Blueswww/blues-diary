@@ -73,6 +73,7 @@ function onSelectAvatar(id: string) {
 }
 
 function startEditNickname() {
+  if (editingNickname.value) return
   nicknameInput.value = userStore.userInfo?.nickName || ''
   editingNickname.value = true
 }
@@ -81,11 +82,13 @@ function saveNickname() {
   const name = nicknameInput.value.trim() || '用户'
   userStore.updateProfile(name, userStore.userInfo?.avatarType)
   editingNickname.value = false
+  nicknameInput.value = name
   uni.showToast({ title: '昵称已更新', icon: 'none' })
 }
 
 function cancelEditNickname() {
   editingNickname.value = false
+  nicknameInput.value = userStore.userInfo?.nickName || ''
 }
 </script>
 
@@ -116,24 +119,25 @@ function cancelEditNickname() {
             <text class="edit-icon">✎</text>
           </view>
         </view>
-        <view class="nickname-row" @tap="startEditNickname">
-          <text class="nickname">{{ userStore.userInfo?.nickName || '用户' }}</text>
-          <text class="edit-hint">编辑</text>
+        <!-- 昵称输入框：始终渲染，永不隐藏销毁 -->
+        <view class="nickname-area">
+          <input
+            class="nickname-input"
+            :class="{ editing: editingNickname }"
+            v-model="nicknameInput"
+            style="color: #1a1a2e;"
+            placeholder="昵称"
+            :readonly="!editingNickname"
+            :focus="editingNickname"
+            @tap="startEditNickname"
+            @confirm="saveNickname"
+          />
+          <text class="edit-hint" v-if="!editingNickname" @tap="startEditNickname">编辑</text>
         </view>
-      </view>
-
-      <!-- 昵称编辑 -->
-      <view class="nickname-editor card" v-if="editingNickname">
-        <input
-          class="input-field"
-          v-model="nicknameInput"
-          style="color: #1a1a2e;"
-          placeholder="输入昵称"
-          @confirm="saveNickname"
-        />
-        <view class="edit-actions">
-          <view class="btn-cancel-sm" @tap="cancelEditNickname">取消</view>
-          <view class="btn-primary" @tap="saveNickname">保存</view>
+        <!-- 编辑按钮 -->
+        <view class="edit-actions" v-if="editingNickname">
+          <view class="btn-edit-cancel" @tap="cancelEditNickname">取消</view>
+          <view class="btn-edit-save" @tap="saveNickname">保存</view>
         </view>
       </view>
 
@@ -250,38 +254,58 @@ function cancelEditNickname() {
     border: 3rpx solid #fff;
     .edit-icon { font-size: 20rpx; color: #fff; }
   }
-  .nickname-row {
+  .nickname-area {
     display: flex;
     align-items: center;
     gap: 12rpx;
-    .nickname { font-size: 34rpx; font-weight: 600; }
-    .edit-hint { font-size: 24rpx; color: $text-light; }
-  }
-}
-.nickname-editor {
-  padding: 24rpx 32rpx;
-  .input-field {
     width: 100%;
-    padding: 20rpx 24rpx;
-    background: $bg-color;
-    border-radius: 16rpx;
-    border: 2rpx solid $border-color;
-    font-size: 28rpx;
-    box-sizing: border-box;
-    color: $text-primary;
+    .nickname-input {
+      flex: 1;
+      font-size: 34rpx;
+      font-weight: 600;
+      text-align: center;
+      border: none;
+      background: transparent;
+      padding: 0;
+      min-height: auto;
+      color: $text-primary;
+      &.editing {
+        font-size: 28rpx;
+        font-weight: normal;
+        text-align: left;
+        background: $bg-color;
+        border: 2rpx solid $border-color;
+        border-radius: 16rpx;
+        padding: 24rpx 28rpx;
+      }
+    }
+    .edit-hint {
+      font-size: 24rpx;
+      color: $text-light;
+      flex-shrink: 0;
+    }
   }
   .edit-actions {
     display: flex;
-    gap: 16rpx;
+    gap: 20rpx;
     margin-top: 20rpx;
-    justify-content: flex-end;
-  }
-  .btn-cancel-sm {
-    font-size: 26rpx;
-    color: $text-secondary;
-    padding: 16rpx 32rpx;
-    border-radius: 30rpx;
-    border: 2rpx solid $border-color;
+    width: 100%;
+    .btn-edit-cancel, .btn-edit-save {
+      flex: 1;
+      text-align: center;
+      padding: 22rpx 0;
+      border-radius: 36rpx;
+      font-size: 28rpx;
+    }
+    .btn-edit-save {
+      background: $primary-color;
+      color: #fff;
+    }
+    .btn-edit-cancel {
+      background: $bg-color;
+      color: $text-secondary;
+      border: 2rpx solid $border-color;
+    }
   }
 }
 .stats-row {
