@@ -221,8 +221,7 @@ function goManageTags() {
         <!-- 内容编辑 -->
         <textarea
           class="editor-textarea"
-          :value="editorContent"
-          @input="e => editorContent = e.detail.value"
+          v-model="editorContent"
           placeholder="今天发生了什么？"
           maxlength="10000"
           auto-height

@@ -84,10 +84,6 @@ function saveNickname() {
   uni.showToast({ title: '昵称已更新', icon: 'none' })
 }
 
-function onNicknameInput(e: any) {
-  nicknameInput.value = e.detail.value
-}
-
 function cancelEditNickname() {
   editingNickname.value = false
 }
@@ -129,13 +125,10 @@ function cancelEditNickname() {
       <!-- 昵称编辑 -->
       <view class="nickname-editor card" v-if="editingNickname">
         <input
-          type="text"
           class="input-field"
-          :value="nicknameInput"
-          @input="onNicknameInput"
+          v-model="nicknameInput"
+          style="color: #1a1a2e;"
           placeholder="输入昵称"
-          maxlength="20"
-          confirm-type="done"
           @confirm="saveNickname"
         />
         <view class="edit-actions">
