@@ -71,7 +71,6 @@ export const useUserStore = defineStore('user', () => {
     loginError.value = null
     uni.removeStorageSync('user_openid')
     uni.removeStorageSync('user_token')
-    uni.removeStorageSync('user_nickName')
   }
 
   /** 更新个人资料 */

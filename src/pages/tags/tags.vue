@@ -76,7 +76,8 @@ function viewTagDiaries(tagId: string) {
     <view class="input-area" v-if="showInput && userStore.isLoggedIn">
       <input
         class="input-field"
-        v-model="newTagName"
+        :value="newTagName"
+          @input="e => newTagName = e.detail.value"
         placeholder="输入标签名称"
         maxlength="10"
         confirm-type="done"

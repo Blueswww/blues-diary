@@ -87,7 +87,8 @@ const progress = () => todoStore.todayProgress()
     <view class="add-todo">
       <input
         class="input-field"
-        v-model="newContent"
+        :value="newContent"
+          @input="e => newContent = e.detail.value"
         placeholder="添加新的待办事项"
         @confirm="addTodo"
         confirm-type="done"

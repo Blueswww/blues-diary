@@ -126,7 +126,8 @@ function cancelEditNickname() {
       <view class="nickname-editor card" v-if="editingNickname">
         <input
           class="input-field"
-          v-model="nicknameInput"
+          :value="nicknameInput"
+          @input="e => nicknameInput = e.detail.value"
           placeholder="输入昵称"
           maxlength="20"
           confirm-type="done"
