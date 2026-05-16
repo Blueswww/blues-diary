@@ -21,6 +21,14 @@ function fmt(year: number, month: number, day: number): string {
   return `${year}-${pad(month)}-${pad(day)}`
 }
 
+/** 二十四节气名称列表 */
+export const SOLAR_TERMS = new Set([
+  '立春', '雨水', '惊蛰', '春分', '清明', '谷雨',
+  '立夏', '小满', '芒种', '夏至', '小暑', '大暑',
+  '立秋', '处暑', '白露', '秋分', '寒露', '霜降',
+  '立冬', '小雪', '大雪', '冬至', '小寒', '大寒',
+])
+
 /** 计算某个月的第 N 个星期几的日期 */
 function nthWeekday(year: number, month: number, weekday: number, nth: number): string {
   const first = new Date(year, month - 1, 1)
@@ -36,11 +44,15 @@ function nthWeekday(year: number, month: number, weekday: number, nth: number): 
  * 可在每年 12 月 31 日自动调用，生成下一年数据
  */
 export function computeYearHolidays(year: number): HolidayInfo[] {
-  const map = new Map<string, string>()   // date → name（同名节日覆盖，不同名以第一个为准）
+  const map = new Map<string, string[]>()   // date → name[]（同一日期允许多个名称：节日 + 节气）
 
   function add(date: string, name: string) {
     if (!map.has(date)) {
-      map.set(date, name)
+      map.set(date, [])
+    }
+    const list = map.get(date)!
+    if (!list.includes(name)) {
+      list.push(name)
     }
   }
 
@@ -120,8 +132,22 @@ export function computeYearHolidays(year: number): HolidayInfo[] {
   // 感恩节：11 月第 4 个星期四
   add(nthWeekday(year, 11, 4, 4), '感恩节')
 
+  // ==================== 二十四节气 ====================
+  for (let m = 1; m <= 12; m++) {
+    const daysInMonth = new Date(year, m, 0).getDate()
+    for (let d = 1; d <= daysInMonth; d++) {
+      try {
+        const solar = Solar.fromYmd(year, m, d)
+        const jieQi = solar.getLunar().getJieQi()
+        if (jieQi) {
+          add(fmt(year, m, d), jieQi)
+        }
+      } catch {}
+    }
+  }
+
   // 按日期排序
   return Array.from(map.entries())
-    .map(([date, name]) => ({ date, name }))
+    .flatMap(([date, names]) => names.map(name => ({ date, name })))
     .sort((a, b) => a.date.localeCompare(b.date))
 }

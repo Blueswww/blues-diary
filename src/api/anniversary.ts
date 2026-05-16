@@ -6,6 +6,7 @@ export interface AnniversaryRecord {
   name: string
   date: string
   type: 'solar' | 'lunar'
+  isOneTime: boolean
   remindDays: number[]
   createdAt: string
 }
@@ -29,6 +30,7 @@ export async function createAnniversary(input: {
   name: string
   date: string
   type: 'solar' | 'lunar'
+  isOneTime?: boolean
   remindDays?: number[]
 }): Promise<CloudFunctionResult<AnniversaryRecord>> {
   try {
@@ -36,6 +38,7 @@ export async function createAnniversary(input: {
       name: input.name,
       date: input.date,
       type: input.type,
+      isOneTime: input.isOneTime || false,
       remindDays: input.remindDays || [7, 1],
       createdAt: db.serverDate(),
     }
@@ -44,6 +47,20 @@ export async function createAnniversary(input: {
   } catch (err: any) {
     console.error('[API] createAnniversary:', err)
     return fail(err.message || '创建纪念日失败')
+  }
+}
+
+/** 更新纪念日 */
+export async function updateAnniversary(
+  id: string,
+  input: { name?: string; date?: string; type?: 'solar' | 'lunar'; isOneTime?: boolean }
+): Promise<CloudFunctionResult> {
+  try {
+    await collection.doc(id).update({ data: input })
+    return ok({ _id: id })
+  } catch (err: any) {
+    console.error('[API] updateAnniversary:', err)
+    return fail(err.message || '更新纪念日失败')
   }
 }
 

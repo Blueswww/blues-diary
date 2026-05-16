@@ -5,6 +5,7 @@ import { setOpenid } from '@/api'
 interface UserInfo {
   openid: string
   nickName?: string
+  avatarType?: string
   avatarUrl?: string
 }
 
@@ -53,6 +54,7 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value = {
         openid: stored,
         nickName: uni.getStorageSync('user_nickName') || '用户',
+        avatarType: uni.getStorageSync('user_avatarType') || undefined,
       }
       return true
     }
@@ -70,10 +72,13 @@ export const useUserStore = defineStore('user', () => {
   }
 
   /** 更新个人资料 */
-  function updateProfile(nickName: string, avatarUrl?: string) {
+  function updateProfile(nickName: string, avatarType?: string) {
     if (userInfo.value) {
       userInfo.value.nickName = nickName
-      userInfo.value.avatarUrl = avatarUrl
+      if (avatarType !== undefined) {
+        userInfo.value.avatarType = avatarType
+        uni.setStorageSync('user_avatarType', avatarType)
+      }
       uni.setStorageSync('user_nickName', nickName)
     }
   }

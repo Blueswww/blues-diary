@@ -6,6 +6,8 @@ import { useDiaryStore } from '@/store/diary'
 import { useTodoStore } from '@/store/todo'
 import { useTagStore } from '@/store/tag'
 import { useAnniversaryStore } from '@/store/anniversary'
+import { getAvatarUrl } from '@/utils/avatars'
+import AvatarSelector from '@/components/AvatarSelector.vue'
 
 const userStore = useUserStore()
 const diaryStore = useDiaryStore()
@@ -16,6 +18,10 @@ const anniversaryStore = useAnniversaryStore()
 const diaryCount = ref(0)
 const weekStreak = ref(0)
 const version = ref('1.0.0')
+
+const showAvatarSelector = ref(false)
+const editingNickname = ref(false)
+const nicknameInput = ref('')
 
 onShow(() => {
   diaryCount.value = Object.values(diaryStore.diaryMap).reduce((sum, arr) => sum + arr.length, 0)
@@ -60,6 +66,27 @@ async function handleLogin() {
     })
   }
 }
+
+function onSelectAvatar(id: string) {
+  userStore.updateProfile(userStore.userInfo?.nickName || '用户', id)
+  showAvatarSelector.value = false
+}
+
+function startEditNickname() {
+  nicknameInput.value = userStore.userInfo?.nickName || ''
+  editingNickname.value = true
+}
+
+function saveNickname() {
+  const name = nicknameInput.value.trim() || '用户'
+  userStore.updateProfile(name, userStore.userInfo?.avatarType)
+  editingNickname.value = false
+  uni.showToast({ title: '昵称已更新', icon: 'none' })
+}
+
+function cancelEditNickname() {
+  editingNickname.value = false
+}
 </script>
 
 <template>
@@ -77,10 +104,38 @@ async function handleLogin() {
     <!-- 用户信息（已登录） -->
     <template v-else>
       <view class="user-section card">
-        <view class="avatar">
-          <text class="avatar-text">{{ userStore.userInfo?.nickName?.charAt(0) || 'U' }}</text>
+        <view class="avatar-wrap" @tap="showAvatarSelector = true">
+          <image
+            v-if="getAvatarUrl(userStore.userInfo?.avatarType)"
+            class="avatar-img"
+            :src="getAvatarUrl(userStore.userInfo?.avatarType)"
+            mode="aspectFit"
+          />
+          <text v-else class="avatar-text">{{ userStore.userInfo?.nickName?.charAt(0) || 'U' }}</text>
+          <view class="avatar-edit-badge">
+            <text class="edit-icon">✎</text>
+          </view>
         </view>
-        <text class="nickname">{{ userStore.userInfo?.nickName || '用户' }}</text>
+        <view class="nickname-row" @tap="startEditNickname">
+          <text class="nickname">{{ userStore.userInfo?.nickName || '用户' }}</text>
+          <text class="edit-hint">编辑</text>
+        </view>
+      </view>
+
+      <!-- 昵称编辑 -->
+      <view class="nickname-editor card" v-if="editingNickname">
+        <input
+          class="input-field"
+          v-model="nicknameInput"
+          placeholder="输入昵称"
+          maxlength="20"
+          confirm-type="done"
+          @confirm="saveNickname"
+        />
+        <view class="edit-actions">
+          <view class="btn-cancel-sm" @tap="cancelEditNickname">取消</view>
+          <view class="btn-primary" @tap="saveNickname">保存</view>
+        </view>
       </view>
 
       <!-- 数据统计 -->
@@ -123,6 +178,13 @@ async function handleLogin() {
     </view>
 
     <text class="version">Blues Diary v{{ version }}</text>
+
+    <!-- 头像选择器 -->
+    <AvatarSelector
+      v-if="showAvatarSelector"
+      @select="onSelectAvatar"
+      @close="showAvatarSelector = false"
+    />
   </view>
 </template>
 
@@ -152,7 +214,18 @@ async function handleLogin() {
   flex-direction: column;
   align-items: center;
   padding: 48rpx 32rpx;
-  .avatar {
+  .avatar-wrap {
+    position: relative;
+    width: 120rpx;
+    height: 120rpx;
+    margin-bottom: 16rpx;
+  }
+  .avatar-img {
+    width: 120rpx;
+    height: 120rpx;
+    border-radius: 50%;
+  }
+  .avatar-text {
     width: 120rpx;
     height: 120rpx;
     border-radius: 50%;
@@ -160,14 +233,57 @@ async function handleLogin() {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 16rpx;
-    .avatar-text {
-      font-size: 48rpx;
-      color: $primary-color;
-      font-weight: 600;
-    }
+    font-size: 48rpx;
+    color: $primary-color;
+    font-weight: 600;
   }
-  .nickname { font-size: 34rpx; font-weight: 600; }
+  .avatar-edit-badge {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 36rpx;
+    height: 36rpx;
+    border-radius: 50%;
+    background: $primary-color;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3rpx solid #fff;
+    .edit-icon { font-size: 20rpx; color: #fff; }
+  }
+  .nickname-row {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    .nickname { font-size: 34rpx; font-weight: 600; }
+    .edit-hint { font-size: 24rpx; color: $text-light; }
+  }
+}
+.nickname-editor {
+  padding: 24rpx 32rpx;
+  .input-field {
+    width: 100%;
+    padding: 20rpx 24rpx;
+    background: $bg-color;
+    border-radius: 16rpx;
+    border: 2rpx solid $border-color;
+    font-size: 28rpx;
+    box-sizing: border-box;
+    color: $text-primary;
+  }
+  .edit-actions {
+    display: flex;
+    gap: 16rpx;
+    margin-top: 20rpx;
+    justify-content: flex-end;
+  }
+  .btn-cancel-sm {
+    font-size: 26rpx;
+    color: $text-secondary;
+    padding: 16rpx 32rpx;
+    border-radius: 30rpx;
+    border: 2rpx solid $border-color;
+  }
 }
 .stats-row {
   display: flex;

@@ -4,7 +4,9 @@ import { ref, computed } from 'vue'
 import { useUserStore } from '@/store/user'
 import { useDiaryStore } from '@/store/diary'
 import { useAnniversaryStore } from '@/store/anniversary'
-import { getMonthDays, formatDate } from '@/utils/dayjs'
+import { Solar, Lunar } from 'lunar-javascript'
+import dayjs, { getMonthDays, formatDate } from '@/utils/dayjs'
+import { getNextLunarDate } from '@/utils/lunar'
 import { useTagStore } from '@/store/tag'
 import { useHolidayStore } from '@/store/holiday'
 import TagBadge from '@/components/TagBadge.vue'
@@ -27,6 +29,87 @@ const selectedHoliday = computed(() => {
     parseInt(selectedDate.value.slice(5, 7)),
     parseInt(selectedDate.value.slice(8, 10))
   )
+})
+
+const selectedHolidayNames = computed(() => {
+  const names = holidayStore.getHolidayNames(selectedDate.value)
+  const common = holidayStore.getCommonAnniversaryName(
+    parseInt(selectedDate.value.slice(5, 7)),
+    parseInt(selectedDate.value.slice(8, 10))
+  )
+  if (common && !names.includes(common)) names.push(common)
+  return names
+})
+
+/** 获取某天的提醒列表 */
+function getAnniversariesForDate(dateStr: string) {
+  const monthDay = dateStr.slice(5)
+  const today = dayjs()
+  return anniversaryStore.anniversaries.filter(a => {
+    if (a.isOneTime) {
+      if (a.type === 'lunar') {
+        // 阴历一次性：用换算后的日期判断
+        try {
+          const d = dayjs(a.date)
+          const solar = Solar.fromYmd(d.year(), d.month() + 1, d.date())
+          const lunar = solar.getLunar()
+          const l = Lunar.fromYmd(today.year(), lunar.getMonth(), lunar.getDay())
+          const s = l.getSolar()
+          const nextDate = `${s.getYear()}-${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}`
+          return nextDate === dateStr && dayjs(nextDate).isAfter(today)
+        } catch { return false }
+      }
+      return a.date === dateStr && dayjs(a.date).isAfter(today, 'day')
+    }
+    // 非一次性
+    if (a.type === 'lunar') {
+      try {
+        const d = dayjs(a.date)
+        const solar = Solar.fromYmd(d.year(), d.month() + 1, d.date())
+        const lunar = solar.getLunar()
+        // 找当前年份中该农历日对应的阳历日期
+        for (let y = today.year(); y <= today.year() + 1; y++) {
+          try {
+            const l = Lunar.fromYmd(y, lunar.getMonth(), lunar.getDay())
+            const s = l.getSolar()
+            const ld = `${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}`
+            if (ld === monthDay || `${s.getYear()}-${ld}` === dateStr) return true
+          } catch {}
+        }
+        return false
+      } catch { return false }
+    }
+    return a.date.slice(5) === monthDay
+  })
+}
+
+/** 日历网格：日期 → 显示文字（最多2个字） */
+const anniversaryLabels = computed(() => {
+  const map = new Map<string, string>()
+  const today = dayjs()
+  for (const a of anniversaryStore.anniversaries) {
+    // 过滤已过期的一次性
+    if (a.isOneTime) {
+      if (a.type === 'lunar') {
+        const next = getNextLunarDate(a.date)
+        if (!dayjs(next).isAfter(today)) continue
+        const prev = map.get(next)
+        if (!prev || prev.length >= 2) map.set(next, a.name.slice(0, 2))
+        continue
+      }
+      if (!dayjs(a.date).isAfter(today)) continue
+    }
+    // 找到该纪念日在日历网格中出现的日期
+    if (a.type === 'lunar') {
+      const next = getNextLunarDate(a.date)
+      const md = next.slice(5)
+      if (!map.has(md) || (map.get(md) || '').length >= 2) map.set(md, a.name.slice(0, 2))
+    } else {
+      const md = a.date.slice(5)
+      if (!map.has(md) || (map.get(md) || '').length >= 2) map.set(md, a.name.slice(0, 2))
+    }
+  }
+  return map
 })
 
 async function loadMonthData() {
@@ -103,7 +186,11 @@ function goToday() {
       >
         <text class="day-number">{{ day.day }}</text>
         <text class="holiday-label" v-if="holidayStore.getHolidayName(day.date)">{{ holidayStore.getHolidayName(day.date)?.slice(0, 2) }}</text>
-        <view class="diary-dot" v-if="diaryStore.hasDiary(day.date)"></view>
+        <text class="term-label" v-if="holidayStore.getSolarTerm(day.date)">{{ holidayStore.getSolarTerm(day.date)?.slice(0, 2) }}</text>
+        <view class="dot-row">
+          <view class="diary-dot" v-if="diaryStore.hasDiary(day.date)"></view>
+          <text class="anni-label" v-if="anniversaryLabels.has(day.date.slice(5))">{{ anniversaryLabels.get(day.date.slice(5)) }}</text>
+        </view>
       </view>
     </view>
 
@@ -112,7 +199,8 @@ function goToday() {
       <view class="detail-header">
         <text class="detail-date">{{ selectedDate }}</text>
         <text class="detail-weekday">{{ formatDate(selectedDate, 'dddd') }}</text>
-        <text class="detail-holiday" v-if="selectedHoliday">- {{ selectedHoliday }}</text>
+        <text class="detail-holiday" v-for="name in selectedHolidayNames" :key="name">- {{ name }}</text>
+        <text class="detail-holiday anniversary-name" v-for="a in getAnniversariesForDate(selectedDate)" :key="a._id">- {{ a.name }}</text>
       </view>
 
       <view class="detail-body" v-if="selectedEntries.length">
@@ -195,18 +283,38 @@ function goToday() {
       .holiday-label { color: rgba(255,255,255,0.85); }
     }
     .day-number { font-size: 28rpx; }
+    .dot-row {
+      display: flex;
+      gap: 4rpx;
+      align-items: center;
+      min-height: 16rpx;
+      margin-top: 2rpx;
+    }
     .diary-dot {
       width: 8rpx;
       height: 8rpx;
       border-radius: 50%;
       background: $primary-color;
-      margin-top: 4rpx;
+    }
+    .anni-label {
+      font-size: 16rpx;
+      color: $primary-color;
+      line-height: 1.2;
+      max-width: 56rpx;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .holiday-label {
       font-size: 18rpx;
       color: $danger-color;
       line-height: 1.2;
       margin-top: 2rpx;
+    }
+    .term-label {
+      font-size: 16rpx;
+      color: #FF8C00;
+      line-height: 1.2;
     }
   }
 }
@@ -216,6 +324,7 @@ function goToday() {
     .detail-date { font-size: 30rpx; font-weight: 600; }
     .detail-weekday { font-size: 24rpx; color: $text-secondary; margin-left: 12rpx; }
     .detail-holiday { font-size: 24rpx; color: $danger-color; margin-left: 8rpx; }
+    .anniversary-name { color: $primary-color; }
   }
   .detail-content { font-size: 28rpx; color: $text-secondary; line-height: 1.7; }
   .detail-footer { margin-top: 16rpx; .read-more { font-size: 26rpx; color: $primary-color; } }

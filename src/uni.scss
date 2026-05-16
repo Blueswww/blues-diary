@@ -31,6 +31,7 @@ $shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   text-align: center;
   border: none;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .btn-danger {
@@ -59,6 +60,7 @@ $shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   border-radius: 16rpx;
   padding: 24rpx 28rpx;
   font-size: 28rpx;
+  color: $text-primary;
   border: 2rpx solid $border-color;
   width: 100%;
   box-sizing: border-box;

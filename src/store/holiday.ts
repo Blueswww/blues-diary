@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { computeYearHolidays, type HolidayInfo } from '@/utils/holidayCalculator'
+import { computeYearHolidays, type HolidayInfo, SOLAR_TERMS } from '@/utils/holidayCalculator'
 import { commonAnniversaries } from '@/utils/holidays'
 
 const CACHE_KEY = 'holiday_cache'
@@ -56,9 +56,22 @@ export const useHolidayStore = defineStore('holiday', () => {
     loaded.value = true
   }
 
-  /** 获取指定日期的节日名称 */
+  /** 获取指定日期所有节日/节气名称 */
+  function getHolidayNames(date: string): string[] {
+    return holidays.value
+      .filter(h => h.date === date)
+      .map(h => h.name)
+  }
+
+  /** 获取指定日期的节日名称（不含节气） */
   function getHolidayName(date: string): string | null {
-    const h = holidays.value.find(h => h.date === date)
+    const h = holidays.value.find(h => h.date === date && !SOLAR_TERMS.has(h.name))
+    return h?.name ?? null
+  }
+
+  /** 获取指定日期的节气名称 */
+  function getSolarTerm(date: string): string | null {
+    const h = holidays.value.find(h => h.date === date && SOLAR_TERMS.has(h.name))
     return h?.name ?? null
   }
 
@@ -82,6 +95,8 @@ export const useHolidayStore = defineStore('holiday', () => {
     loaded,
     loadHolidays,
     getHolidayName,
+    getHolidayNames,
+    getSolarTerm,
     getCommonAnniversaryName,
     clearCache,
   }
