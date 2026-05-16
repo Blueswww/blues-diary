@@ -24,9 +24,12 @@ export const useUserStore = defineStore('user', () => {
       const res = await wxNative.cloud.callFunction({ name: 'login' })
       if (res.result?.success && res.result.data?.openid) {
         const openid = res.result.data.openid
-        const nickName = res.result.data.nickName || '用户'
+        const cloudNick = res.result.data.nickName || '用户'
         setOpenid(openid)
-        userInfo.value = { openid, nickName }
+        // 优先使用本地缓存的昵称（用户手动编辑过），其次用云函数返回的微信昵称
+        const nickName = uni.getStorageSync('user_nickName') || cloudNick
+        const avatarType = uni.getStorageSync('user_avatarType') || undefined
+        userInfo.value = { openid, nickName, avatarType }
         uni.setStorageSync('user_openid', openid)
         uni.setStorageSync('user_nickName', nickName)
         return true
