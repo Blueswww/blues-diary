@@ -75,6 +75,7 @@ function viewTagDiaries(tagId: string) {
 
     <view class="input-area" v-if="showInput && userStore.isLoggedIn">
       <input
+         type="text"
         class="input-field"
         :value="newTagName"
           @input="e => newTagName = e.detail.value"

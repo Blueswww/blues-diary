@@ -165,7 +165,7 @@ function getLunarDisplay(solarDate: string): string {
     <!-- 添加/编辑表单 -->
     <view class="form-area card" v-if="showForm">
       <text class="form-title">{{ isEditing ? '编辑提醒' : '新建提醒' }}</text>
-      <input class="input-field" :value="form.name"
+      <input type="text" class="input-field" :value="form.name"
           @input="e => form.name = e.detail.value" :placeholder="isEditing ? '提醒名称' : '提醒名称'" />
       <picker mode="date" :value="form.date" @change="e => form.date = e.detail.value">
         <view class="picker">{{ form.date }}</view>
