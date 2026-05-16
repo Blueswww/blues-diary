@@ -75,13 +75,11 @@ function viewTagDiaries(tagId: string) {
 
     <view class="input-area" v-if="showInput && userStore.isLoggedIn">
       <input
-         type="text"
         class="input-field"
-        :value="newTagName"
-          @input="e => newTagName = e.detail.value"
+        v-model="newTagName"
+        style="color: #1a1a2e;"
         placeholder="输入标签名称"
         maxlength="10"
-        confirm-type="done"
         @confirm="createTag"
       />
       <view class="btn-primary" @tap="createTag">创建</view>

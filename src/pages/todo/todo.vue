@@ -86,13 +86,11 @@ const progress = () => todoStore.todayProgress()
     <!-- 添加待办 -->
     <view class="add-todo">
       <input
-         type="text"
         class="input-field"
-        :value="newContent"
-          @input="e => newContent = e.detail.value"
+        v-model="newContent"
+        style="color: #1a1a2e;"
         placeholder="添加新的待办事项"
         @confirm="addTodo"
-        confirm-type="done"
       />
       <view class="btn-small add-btn" @tap="addTodo">添加</view>
     </view>
