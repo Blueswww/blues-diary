@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onHide } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { useUserStore } from '@/store/user'
 import { useTodoStore } from '@/store/todo'
@@ -11,6 +11,8 @@ const todoStore = useTodoStore()
 const newContent = ref('')
 const activeDate = ref(getToday())
 const expandedId = ref('')
+const reminderTodoId = ref('')       // 当前设置提醒的 todo id
+const reminderTime = ref('08:00')    // 提醒时间选择器值
 
 onShow(() => {
   if (!userStore.isLoggedIn) {
@@ -18,6 +20,11 @@ onShow(() => {
     return
   }
   loadTodos()
+  todoStore.startReminderCheck()
+})
+
+onHide(() => {
+  todoStore.stopReminderCheck()
 })
 
 function loadTodos() {
@@ -38,6 +45,45 @@ async function addTodo() {
   if (!content) return
   await todoStore.addTodo(activeDate.value, content)
   newContent.value = ''
+}
+
+function showReminderPicker(todoId: string, currentTime?: string) {
+  reminderTodoId.value = reminderTodoId.value === todoId ? '' : todoId
+  if (currentTime) reminderTime.value = currentTime
+}
+
+async function confirmReminder(todo: any) {
+  if (!requireLogin()) return
+  if (!reminderTime.value) return
+
+  // 先请求订阅授权（必须在用户点击事件中调用）
+  const templateId = 'mP9JdbNYlo-2QvknNlB3DBNLtbKv0kkFJDbUvrvHbus'
+  const wxNative = (globalThis as any)['w' + 'x']
+  const subRes = await new Promise<any>((resolve) => {
+    wxNative.requestSubscribeMessage({
+      tmplIds: [templateId],
+      success: resolve,
+      fail: (err: any) => resolve({ errMsg: err.errMsg || 'fail' }),
+    })
+  })
+
+  if (subRes.errMsg?.includes('fail') || subRes[templateId] !== 'accept') {
+    uni.showToast({ title: '需要同意订阅才能设置提醒', icon: 'none' })
+    return
+  }
+
+  const success = await todoStore.setReminder(todo._id, { enabled: true, time: reminderTime.value })
+  if (success) {
+    uni.showToast({ title: '提醒已设置', icon: 'success' })
+    reminderTodoId.value = ''
+  }
+}
+
+async function clearReminder(todoId: string) {
+  if (!requireLogin()) return
+  await todoStore.setReminder(todoId, null)
+  uni.showToast({ title: '提醒已取消', icon: 'none' })
+  reminderTodoId.value = ''
 }
 
 async function toggle(todoId: string, done: boolean) {
@@ -97,21 +143,39 @@ const progress = () => todoStore.todayProgress()
 
     <!-- 待办列表 -->
     <view class="todo-list" v-if="todoStore.todos.length && userStore.isLoggedIn">
-      <view
-        class="todo-item card"
-        :class="{ expanded: expandedId === todo._id }"
-        v-for="todo in todoStore.todos"
-        :key="todo._id"
-        @tap="toggleExpand(todo._id)"
-      >
-        <view class="checkbox" :class="{ checked: todo.isDone }" @tap.stop="toggle(todo._id, !todo.isDone)">
-          <text v-if="todo.isDone">✓</text>
+      <view class="todo-item-wrap" v-for="todo in todoStore.todos" :key="todo._id">
+        <view class="todo-item card" :class="{ expanded: expandedId === todo._id }" @tap="toggleExpand(todo._id)">
+          <view class="checkbox" :class="{ checked: todo.isDone }" @tap.stop="toggle(todo._id, !todo.isDone)">
+            <text v-if="todo.isDone">✓</text>
+          </view>
+          <view class="todo-body">
+            <text class="todo-content" :class="{ done: todo.isDone }">{{ todo.content }}</text>
+            <text class="todo-time" v-if="expandedId === todo._id">{{ todo.createdAt || '' }}</text>
+            <text class="todo-reminder-badge" v-if="todo.reminder?.enabled && !todo.reminded">🔔 {{ todo.reminder.time }}</text>
+            <text class="todo-reminder-badge reminded" v-else-if="todo.reminded">✅ 已提醒</text>
+          </view>
+          <view class="todo-actions">
+            <text
+              class="reminder-btn"
+              :class="{ active: reminderTodoId === todo._id, enabled: todo.reminder?.enabled }"
+              @tap.stop="showReminderPicker(todo._id, todo.reminder?.time)"
+            >🔔</text>
+            <text class="delete-todo" @tap.stop="removeTodo(todo._id)">✕</text>
+          </view>
         </view>
-        <view class="todo-body">
-          <text class="todo-content" :class="{ done: todo.isDone }">{{ todo.content }}</text>
-          <text class="todo-time" v-if="expandedId === todo._id">{{ todo.createdAt || '' }}</text>
+        <!-- 提醒时间选择器 -->
+        <view class="reminder-panel" v-if="reminderTodoId === todo._id">
+          <picker mode="time" :value="reminderTime" @change="e => reminderTime = e.detail.value">
+            <view class="reminder-row">
+              <text class="reminder-label">提醒时间</text>
+              <text class="reminder-value">{{ reminderTime }}</text>
+            </view>
+          </picker>
+          <view class="reminder-actions">
+            <view class="btn-small" @tap.stop="confirmReminder(todo)">确认</view>
+            <view class="btn-small btn-cancel" @tap.stop="clearReminder(todo._id)" v-if="todo.reminder?.enabled">取消</view>
+          </view>
         </view>
-        <text class="delete-todo" @tap.stop="removeTodo(todo._id)">✕</text>
       </view>
     </view>
 
@@ -211,6 +275,61 @@ const progress = () => todoStore.todayProgress()
     color: $text-light;
     font-size: 28rpx;
     padding: 8rpx;
+  }
+  .todo-actions {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+    flex-shrink: 0;
+  }
+  .reminder-btn {
+    font-size: 26rpx;
+    width: 56rpx;
+    height: 56rpx;
+    line-height: 56rpx;
+    text-align: center;
+    border-radius: 50%;
+    background: $bg-color;
+    border: 2rpx solid $border-color;
+    flex-shrink: 0;
+    &.active {
+      background: $primary-light;
+      border-color: $primary-color;
+    }
+    &.enabled {
+      background: #fff3e0;
+      border-color: #ff9800;
+    }
+  }
+  .todo-reminder-badge {
+    font-size: 22rpx;
+    color: $primary-color;
+    margin-top: 6rpx;
+    display: block;
+    &.reminded { color: $success-color; }
+  }
+}
+.todo-item-wrap {
+  margin-bottom: 8rpx;
+}
+.reminder-panel {
+  background: $card-bg;
+  border-top: 2rpx solid $border-color;
+  padding: 16rpx 32rpx 20rpx;
+  border-radius: 0 0 16rpx 16rpx;
+  .reminder-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16rpx 0;
+    .reminder-label { font-size: 26rpx; color: $text-secondary; }
+    .reminder-value { font-size: 28rpx; font-weight: 600; color: $primary-color; }
+  }
+  .reminder-actions {
+    display: flex;
+    gap: 16rpx;
+    justify-content: flex-end;
+    .btn-cancel { background: $border-color; color: $text-secondary; }
   }
 }
 </style>

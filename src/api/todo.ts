@@ -1,6 +1,11 @@
 import { getDB, ok, fail } from './index'
 import type { CloudFunctionResult } from './types'
 
+export interface TodoReminder {
+  enabled: boolean
+  time: string // HH:mm 格式
+}
+
 export interface TodoRecord {
   _id: string
   date: string
@@ -8,6 +13,8 @@ export interface TodoRecord {
   isDone: boolean
   priority: 'low' | 'medium' | 'high'
   createdAt: string
+  reminder?: TodoReminder
+  reminded?: boolean
 }
 
 const db = getDB()
@@ -57,6 +64,22 @@ export async function toggleTodo(id: string, isDone: boolean): Promise<CloudFunc
   } catch (err: any) {
     console.error('[API] toggleTodo:', err)
     return fail(err.message || '更新待办失败')
+  }
+}
+
+/** 更新待办提醒设置 */
+export async function updateTodoReminder(
+  id: string,
+  reminder: TodoReminder | null
+): Promise<CloudFunctionResult> {
+  try {
+    await collection.doc(id).update({
+      data: { reminder, reminded: false },
+    })
+    return ok({ _id: id, reminder })
+  } catch (err: any) {
+    console.error('[API] updateTodoReminder:', err)
+    return fail(err.message || '更新提醒失败')
   }
 }
 

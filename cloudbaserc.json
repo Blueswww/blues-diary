@@ -71,6 +71,11 @@
           }
         }
       ]
+    },
+    {
+      "name": "sendReminder",
+      "timeout": 5,
+      "triggers": []
     }
   ]
 }
