@@ -100,8 +100,8 @@ export const useTodoStore = defineStore('todo', () => {
       sendingReminders.value.add(todo._id)
       try {
         await sendReminderMessage(todo.content, todo.reminder!.time, todo.date)
-        // 标记已提醒
-        await updateTodoReminder(todo._id, { ...todo.reminder!, enabled: true })
+        // 标记已提醒（持久化 reminded 状态，防止数据重载后重复触发）
+        await updateTodoReminder(todo._id, { ...todo.reminder!, enabled: true }, true)
         const t = todos.value.find(t => t._id === todo._id)
         if (t) t.reminded = true
         const tt = todayTodos.value.find(t => t._id === todo._id)

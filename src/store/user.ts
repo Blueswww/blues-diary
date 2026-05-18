@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { setOpenid } from '@/api'
+import { setOpenid, getOpenid, getDB } from '@/api'
 
 interface UserInfo {
   openid: string
@@ -73,7 +73,7 @@ export const useUserStore = defineStore('user', () => {
     uni.removeStorageSync('user_token')
   }
 
-  /** 更新个人资料 */
+  /** 更新个人资料（同步到云数据库） */
   function updateProfile(nickName: string, avatarType?: string) {
     if (userInfo.value) {
       userInfo.value.nickName = nickName
@@ -82,6 +82,27 @@ export const useUserStore = defineStore('user', () => {
         uni.setStorageSync('user_avatarType', avatarType)
       }
       uni.setStorageSync('user_nickName', nickName)
+
+      // 同步到云数据库
+      syncProfileToCloud(nickName, avatarType)
+    }
+  }
+
+  /** 将个人资料写入云数据库 */
+  async function syncProfileToCloud(nickName: string, avatarType?: string) {
+    try {
+      const openid = getOpenid()
+      if (!openid) return
+      const db = getDB()
+      const usersCollection = db.collection('users')
+      const existing = await usersCollection.where({ openid }).get()
+      if (existing.data.length > 0) {
+        const data: Record<string, any> = { nickName }
+        if (avatarType !== undefined) data.avatarType = avatarType
+        await usersCollection.doc(existing.data[0]._id).update({ data })
+      }
+    } catch (e) {
+      console.error('[UserStore] 同步昵称到云端失败:', e)
     }
   }
 

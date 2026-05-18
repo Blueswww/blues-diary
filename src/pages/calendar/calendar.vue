@@ -73,7 +73,7 @@ function getAnniversariesForDate(dateStr: string) {
             const l = Lunar.fromYmd(y, lunar.getMonth(), lunar.getDay())
             const s = l.getSolar()
             const ld = `${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}`
-            if (ld === monthDay || `${s.getYear()}-${ld}` === dateStr) return true
+            if (`${s.getYear()}-${ld}` === dateStr) return true
           } catch {}
         }
         return false

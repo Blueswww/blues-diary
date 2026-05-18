@@ -10,14 +10,14 @@ export const useAnniversaryStore = defineStore('anniversary', () => {
 
   /** 即将到来的纪念日（近 30 天） */
   const upcomingAnniversaries = computed(() => {
-    const today = dayjs()
+    const today = dayjs().startOf('day')
     return anniversaries.value
       .map(a => {
         let dateThisYear
         if (a.type === 'lunar') {
-          dateThisYear = dayjs(getNextLunarDate(a.date))
+          dateThisYear = dayjs(getNextLunarDate(a.date)).startOf('day')
         } else {
-          dateThisYear = dayjs(`${today.year()}-${dayjs(a.date).format('MM-DD')}`)
+          dateThisYear = dayjs(`${today.year()}-${dayjs(a.date).format('MM-DD')}`).startOf('day')
         }
         const diff = dateThisYear.diff(today, 'day')
         const daysUntil = diff >= 0 ? diff : dateThisYear.add(1, 'year').diff(today, 'day')

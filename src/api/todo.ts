@@ -70,12 +70,13 @@ export async function toggleTodo(id: string, isDone: boolean): Promise<CloudFunc
 /** 更新待办提醒设置 */
 export async function updateTodoReminder(
   id: string,
-  reminder: TodoReminder | null
+  reminder: TodoReminder | null,
+  reminded?: boolean,
 ): Promise<CloudFunctionResult> {
   try {
-    await collection.doc(id).update({
-      data: { reminder, reminded: false },
-    })
+    const data: Record<string, any> = { reminder }
+    if (reminded !== undefined) data.reminded = reminded
+    await collection.doc(id).update({ data })
     return ok({ _id: id, reminder })
   } catch (err: any) {
     console.error('[API] updateTodoReminder:', err)

@@ -26,6 +26,8 @@ const nicknameInput = ref('')
 onShow(() => {
   diaryCount.value = Object.values(diaryStore.diaryMap).reduce((sum, arr) => sum + arr.length, 0)
   weekStreak.value = diaryStore.weekStreak
+  // 同步当前昵称到输入框（只读模式时显示）
+  nicknameInput.value = userStore.userInfo?.nickName || ''
 })
 
 function goToTags() {

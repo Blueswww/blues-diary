@@ -118,7 +118,16 @@ function viewTagDiaries(tagId: string) {
   display: flex;
   gap: 16rpx;
   align-items: center;
-  .input-field { flex: 1; }
+  .input-field {
+    flex: 1;
+    height: 72rpx;
+    padding: 0 24rpx;
+    font-size: 28rpx;
+    color: $text-primary;
+    background: $card-bg;
+    border: 2rpx solid $border-color;
+    border-radius: 16rpx;
+  }
   .btn-primary {
     width: auto;
     padding: 20rpx 40rpx;

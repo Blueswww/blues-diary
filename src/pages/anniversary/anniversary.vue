@@ -14,7 +14,8 @@ const store = useAnniversaryStore()
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const isEditing = computed(() => !!editingId.value)
-const form = ref({ name: '', date: getToday(), type: 'solar' as 'solar' | 'lunar', isOneTime: false })
+const nameInput = ref('')
+const form = ref({ date: getToday(), type: 'solar' as 'solar' | 'lunar', isOneTime: false })
 
 onShow(() => {
   if (!userStore.isLoggedIn) {
@@ -34,28 +35,28 @@ function requireLogin(): boolean {
 
 /** 过滤掉已过期的一次性提醒 */
 const visibleAnniversaries = computed(() => {
-  const today = dayjs()
+  const today = dayjs().startOf('day')
   return store.anniversaries.filter(a => {
     if (!a.isOneTime) return true
     if (a.type === 'lunar') {
       // 阴历一次性：用换算后的阳历日期判断
       const nextSolar = getNextLunarDate(a.date)
-      return dayjs(nextSolar).isAfter(today) || dayjs(nextSolar).isSame(today, 'day')
+      return dayjs(nextSolar).startOf('day').isAfter(today) || dayjs(nextSolar).startOf('day').isSame(today, 'day')
     }
-    return dayjs(a.date).isAfter(today, 'day') || dayjs(a.date).isSame(today, 'day')
+    return dayjs(a.date).startOf('day').isAfter(today) || dayjs(a.date).startOf('day').isSame(today, 'day')
   })
 })
 
 /** 计算提醒的倒计时/已过天数 */
 function itemInfo(item: { date: string; type: string; isOneTime: boolean }): { badge: string; detail?: string } {
-  const today = dayjs()
+  const today = dayjs().startOf('day')
 
   if (item.type === 'lunar') {
     // 阴历：换算到最近的下一次阳历日期
     const nextDate = getNextLunarDate(item.date)
-    const target = dayjs(nextDate)
+    const target = dayjs(nextDate).startOf('day')
     const diff = target.diff(today, 'day')
-    const originalTarget = dayjs(item.date)
+    const originalTarget = dayjs(item.date).startOf('day')
     const totalElapsed = today.diff(originalTarget, 'day')
     if (diff === 0) {
       if (totalElapsed > 0) return { badge: '就是今天!', detail: `已过 ${totalElapsed} 天` }
@@ -67,8 +68,8 @@ function itemInfo(item: { date: string; type: string; isOneTime: boolean }): { b
   }
 
   // 阳历：在当前年找对应月日
-  const target = dayjs(item.date)
-  const thisYear = dayjs(`${today.year()}-${target.format('MM-DD')}`)
+  const target = dayjs(item.date).startOf('day')
+  const thisYear = dayjs(`${today.year()}-${target.format('MM-DD')}`).startOf('day')
   const diff = thisYear.diff(today, 'day')
 
   if (diff === 0) {
@@ -93,19 +94,21 @@ function itemInfo(item: { date: string; type: string; isOneTime: boolean }): { b
 
 function startEdit(item: { _id: string; name: string; date: string; type: 'solar' | 'lunar'; isOneTime: boolean }) {
   editingId.value = item._id
-  form.value = { name: item.name, date: item.date, type: item.type, isOneTime: item.isOneTime }
+  nameInput.value = item.name
+  form.value = { date: item.date, type: item.type, isOneTime: item.isOneTime }
   showForm.value = true
 }
 
 function cancelEdit() {
   editingId.value = null
-  form.value = { name: '', date: getToday(), type: 'solar', isOneTime: false }
+  nameInput.value = ''
+  form.value = { date: getToday(), type: 'solar', isOneTime: false }
   showForm.value = false
 }
 
 async function saveItem() {
   if (!requireLogin()) return
-  if (!form.value.name.trim()) {
+  if (!nameInput.value.trim()) {
     uni.showToast({ title: '请输入提醒名称', icon: 'none' })
     return
   }
@@ -117,12 +120,14 @@ async function saveItem() {
       return
     }
   }
+  const payload = { ...form.value, name: nameInput.value.trim() }
   if (editingId.value) {
-    await store.editAnniversary(editingId.value, { ...form.value })
+    await store.editAnniversary(editingId.value, payload)
     cancelEdit()
   } else {
-    await store.addAnniversary({ ...form.value })
-    form.value = { name: '', date: getToday(), type: 'solar', isOneTime: false }
+    await store.addAnniversary(payload)
+    nameInput.value = ''
+    form.value = { date: getToday(), type: 'solar', isOneTime: false }
     showForm.value = false
   }
 }
@@ -165,7 +170,7 @@ function getLunarDisplay(solarDate: string): string {
     <!-- 添加/编辑表单 -->
     <view class="form-area card" v-if="showForm">
       <text class="form-title">{{ isEditing ? '编辑提醒' : '新建提醒' }}</text>
-      <input class="input-field" v-model="form.name" placeholder="提醒名称" />
+      <input class="input-field" v-model="nameInput" placeholder="提醒名称" style="color: #1a1a2e;" />
       <picker mode="date" :value="form.date" @change="e => form.date = e.detail.value">
         <view class="picker">{{ form.date }}</view>
       </picker>
@@ -246,6 +251,16 @@ function getLunarDisplay(solarDate: string): string {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
+  .input-field {
+    flex: 1;
+    height: 72rpx;
+    padding: 0 28rpx;
+    background: $bg-color;
+    border-radius: 16rpx;
+    border: 2rpx solid $border-color;
+    font-size: 28rpx;
+    color: #1a1a2e;
+  }
   .picker {
     padding: 24rpx 28rpx;
     background: $bg-color;
